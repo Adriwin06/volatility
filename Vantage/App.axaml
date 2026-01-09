@@ -20,7 +20,13 @@
         
         <DataTemplate x:Key="EnumTemplate" DataType="System:Enum">
             <ComboBox ItemsSource="{Binding ., Converter={StaticResource EnumValueConverter}}"
-                      SelectedItem="{Binding ., Mode=TwoWay}"> </ComboBox>
+                      SelectedItem="{Binding ., Mode=TwoWay}">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Converter={StaticResource EnumValueConverter}, ConverterParameter=Label}" />
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
         </DataTemplate>
         
         <DataTemplate x:Key="BooleanTemplate" DataType="System:Boolean">

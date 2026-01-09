@@ -11,30 +11,40 @@ public class EnumValueConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        if (value != null && value.GetType().IsEnum)
+        if (value == null || !value.GetType().IsEnum)
         {
-            var enumType = value.GetType();
-            return Enum.GetValues(enumType).Cast<object>().Select(enumValue =>
-            {
-                var fieldInfo = enumType.GetField(enumValue.ToString());
-                var attribute = fieldInfo?.GetCustomAttribute<EditorLabelAttribute>();
-
-                return new
-                {
-                    Value = enumValue,
-                    Label = attribute?.Label ?? enumValue.ToString()
-                };
-            }).ToList();
+            return null;
         }
-        return null;
+
+        var enumType = value.GetType();
+        if (parameter is string mode && mode == "Label")
+        {
+            return GetEnumLabel(enumType, value);
+        }
+
+        return Enum.GetValues(enumType).Cast<object>().ToArray();
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        if (value != null && value.GetType().GetProperty("Value") != null)
+        if (value == null)
         {
-            return value.GetType().GetProperty("Value").GetValue(value);
+            return null;
         }
-        return null;
+
+        if (value.GetType().IsEnum)
+        {
+            return value;
+        }
+
+        var property = value.GetType().GetProperty("Value");
+        return property != null ? property.GetValue(value) : null;
+    }
+
+    private static string GetEnumLabel(Type enumType, object enumValue)
+    {
+        var fieldInfo = enumType.GetField(enumValue.ToString());
+        var attribute = fieldInfo?.GetCustomAttribute<EditorLabelAttribute>();
+        return attribute?.Label ?? enumValue.ToString();
     }
 }
