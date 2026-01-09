@@ -4,6 +4,7 @@ using System.Text;
 using Volatility.Utilities;
 
 using static Volatility.Utilities.DataUtilities;
+using static Volatility.Utilities.X360TextureUtilities;
 
 namespace Volatility.Resources;
 
@@ -76,14 +77,19 @@ public class TextureX360 : TextureBase
     {
         // TODO: Implement better parser
         // Not accurate. Only prevents 3D & cubemaps from being GR/Prop Textures
-        GRTexture = PropTexture = Format.Dimension switch
+        bool setFlags = Format.Dimension switch
         {
             GPUDIMENSION.GPUDIMENSION_1D => true,
             GPUDIMENSION.GPUDIMENSION_3D => false,
             GPUDIMENSION.GPUDIMENSION_CUBEMAP => false,
             _ => true,
         };
-        WorldTexture = true;
+
+        TextureBaseUsageFlags f = UsageFlags & ~TextureBaseUsageFlags.AnyTexture;
+        if (setFlags) f |= TextureBaseUsageFlags.GRTexture | TextureBaseUsageFlags.PropTexture;
+        f |= TextureBaseUsageFlags.WorldTexture;
+
+        UsageFlags = f;
 
         base.PullInternalFlags();
     }

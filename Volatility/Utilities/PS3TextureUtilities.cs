@@ -2,10 +2,17 @@
 
 using Volatility.Resources;
 
+using static Volatility.Utilities.EnvironmentUtilities;
+
 namespace Volatility.Utilities;
 
 public static class PS3TextureUtilities
 {
+    public static uint CalculatePitchPS3(int width, int blockSize)
+    {
+        return (uint)(((width + 3) / 4) * blockSize);
+    }
+
     public static void PS3GTFToDDS(TexturePS3 ps3Header, string sourceBitmapPath, string destinationBitmapPath, bool verbose = false)
     {
         byte[] header = new byte[0xE];
@@ -61,7 +68,11 @@ public static class PS3TextureUtilities
 
         File.WriteAllBytes($"{destinationBitmapPath}.gtf", gtf);
 
-        string gtf2ddsPath = $"tools{Path.DirectorySeparatorChar}gtf2dds.exe";
+        string gtf2ddsPath = Path.Combine
+        (
+            GetEnvironmentDirectory(EnvironmentDirectory.Tools),
+            "gtf2dds.exe"
+        );
 
         if (!File.Exists(gtf2ddsPath))
         {
@@ -78,7 +89,7 @@ public static class PS3TextureUtilities
             CreateNoWindow = true
         };
 
-        if (verbose) Console.WriteLine($"Running: tools{Path.DirectorySeparatorChar}gtf2dds.exe -o \"{destinationBitmapPath}.dds\" \"{destinationBitmapPath}.gtf\"");
+        if (verbose) Console.WriteLine($"Running: {gtf2ddsPath} -o \"{destinationBitmapPath}.dds\" \"{destinationBitmapPath}.gtf\"");
 
         using (Process process = new Process())
         {

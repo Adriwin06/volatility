@@ -2,7 +2,7 @@ using System.Reflection;
 
 using Volatility.Resources;
 
-using static Volatility.Utilities.DataUtilities;
+using static Volatility.Utilities.TypeUtilities;
 using static Volatility.Utilities.ResourceIDUtilities;
 
 namespace Volatility.CLI.Commands;
@@ -48,12 +48,12 @@ internal class AutotestCommand : ICommand
         TexturePC textureHeaderPC = new TexturePC
         {
             AssetName = "autotest_header_PC",
-            ResourceID = GetResourceIDFromName("autotest_header_PC"),
+            ResourceID = ResourceID.HashFromString("autotest_header_PC"),
             Format = D3DFORMAT.D3DFMT_DXT1,
             Width = 1024,
             Height = 512,
             MipmapLevels = 11,
-            GRTexture = true
+            UsageFlags = TextureBaseUsageFlags.GRTexture
         };
 
         TestHeaderRW("autotest_header_PC.dat", textureHeaderPC);
@@ -62,12 +62,12 @@ internal class AutotestCommand : ICommand
         TextureBPR textureHeaderBPR = new TextureBPR
         {
             AssetName = "autotest_header_BPR",
-            ResourceID = GetResourceIDFromName("autotest_header_BPR"),
+            ResourceID = ResourceID.HashFromString("autotest_header_BPR"),
             Format = DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM,
             Width = 1024,
             Height = 512,
             MipmapLevels = 11,
-            GRTexture = true
+            UsageFlags = TextureBaseUsageFlags.GRTexture
         };
 
         // SKIPPING BPR IMPORT AS IT'S NOT SUPPORTED YET
@@ -77,7 +77,7 @@ internal class AutotestCommand : ICommand
 
         textureHeaderBPR.SetResourceArch(Arch.x64);
         textureHeaderBPR.AssetName = "autotest_header_BPRx64";
-        textureHeaderBPR.ResourceID = GetResourceIDFromName(textureHeaderBPR.AssetName);
+        textureHeaderBPR.ResourceID = ResourceID.HashFromString(textureHeaderBPR.AssetName);
 
         // Write 64 bit test BPR header
         TestHeaderRW("autotest_header_BPRx64.dat", textureHeaderBPR);
@@ -86,12 +86,12 @@ internal class AutotestCommand : ICommand
         TexturePS3 textureHeaderPS3 = new TexturePS3
         {
             AssetName = "autotest_header_PS3",
-            ResourceID = GetResourceIDFromName("autotest_header_PS3"),
+            ResourceID = ResourceID.HashFromString("autotest_header_PS3"),
             Format = CELL_GCM_COLOR_FORMAT.CELL_GCM_TEXTURE_COMPRESSED_DXT45,
             Width = 1024,
             Height = 512,
             MipmapLevels = 11,
-            GRTexture = true
+            UsageFlags = TextureBaseUsageFlags.GRTexture
         };
         textureHeaderPS3.PushAll();
         TestHeaderRW("autotest_header_PS3.dat", textureHeaderPS3);
@@ -100,7 +100,7 @@ internal class AutotestCommand : ICommand
         TextureX360 textureHeaderX360 = new TextureX360
         {
             AssetName = "autotest_header_X360",
-            ResourceID = GetResourceIDFromName("autotest_header_X360"),
+            ResourceID = ResourceID.HashFromString("autotest_header_X360"),
             Format = new GPUTEXTURE_FETCH_CONSTANT
             {
                 Tiled = true,
@@ -113,7 +113,7 @@ internal class AutotestCommand : ICommand
             Height = 512,
             Depth = 1,
             MipmapLevels = 11,
-            GRTexture = true
+            UsageFlags = TextureBaseUsageFlags.GRTexture
         };
         textureHeaderX360.PushAll();
         TestHeaderRW("autotest_header_X360.dat", textureHeaderX360);

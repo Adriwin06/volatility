@@ -94,7 +94,7 @@ public abstract class Resource
             else
             {
                 // TODO: Add new entry to ResourceDB
-                ResourceID = Convert.ToUInt64(GetResourceIDFromName(name, importEndianness), 16);
+                ResourceID = Convert.ToUInt64(ResourceID.FromIDString(name));
                 AssetName = name;
             }
 
@@ -108,7 +108,7 @@ public abstract class Resource
 
     private static Unpacker GetUnpackerFromFileName(string filename)
     {
-        var name = Path.GetFileName(filename);
+        string name = Path.GetFileName(filename);
         return name switch
         {
             var n when n.EndsWith("_1.bin", StringComparison.OrdinalIgnoreCase) => Unpacker.Bnd2Manager,
@@ -176,8 +176,8 @@ public enum ResourceType
     HudMessageSequenceDictionary = 0x2F,
     WorldPainter2D = 0x30,
     PFXHookBundle = 0x31,
-    ShaderTechnique = 0x32,
     Shader = 0x32,
+    ShaderTechnique = 0x32,
     RawFile = 0x40,
     ICETakeDictionary = 0x41,
     VideoData = 0x42,
