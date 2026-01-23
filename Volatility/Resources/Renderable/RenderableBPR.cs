@@ -22,6 +22,10 @@ public class RenderableBPR : RenderableBase
     public RenderableBPR(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 }
 
+public class DrawIndexedParametersBPR : DrawIndexedParametersBase
+{
+}
+
 public enum D3D11_PRIMITIVE_TOPOLOGY
 {
     UNDEFINED = 0,

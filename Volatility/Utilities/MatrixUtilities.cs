@@ -36,6 +36,11 @@ public static class MatrixUtilities
 
     public static Matrix44Affine ReadMatrix44Affine(BinaryReader reader)
     {
+        return (Matrix44Affine)ReadMatrix44(reader);
+    }
+
+    public static Matrix44 ReadMatrix44(BinaryReader reader)
+    {
         float m11 = reader.ReadSingle();
         float m12 = reader.ReadSingle();
         float m13 = reader.ReadSingle();
