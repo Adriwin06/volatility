@@ -411,3 +411,6 @@ FodyWeavers.xsd
 
 # dotnet publish
 volatility_*_release/
+
+# Extra reference material
+[Rr]eference/
