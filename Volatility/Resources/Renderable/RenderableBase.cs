@@ -63,7 +63,7 @@ public abstract class RenderableBase : Resource
     public struct RenderableMesh
     {
         public Matrix44 BoundingBox;
-        public DrawIndexedParametersBase DrawIndexedParameters;
+        public DrawIndexedParameters DrawIndexedParameters;
         public ResourceImport MaterialAssembly;
         public byte NumVertexDescriptors;
         public byte InstanceCount;
@@ -71,10 +71,16 @@ public abstract class RenderableBase : Resource
         public byte Flags;
     }
 
+    public struct DrawIndexedParameters
+    {
+        public GeometryPrimitiveType GeometryPrimitiveType;
+        public int BaseVertexIndex;
+        public uint StartIndex;
+        public uint IndexCount;     // number of indices in docs
+        public uint MinimumIndex;
+        public uint NumPrimitives;
+    }
+
     public RenderableBase(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 }
 
-public class DrawIndexedParametersBase
-{
-    
-}
