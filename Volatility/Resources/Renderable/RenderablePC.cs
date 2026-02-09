@@ -19,5 +19,18 @@ public class RenderablePC : RenderableBase
         base.ParseFromStream(reader, endianness);
     }
 
+    public override DrawIndexedParameters ParseDrawIndexedParameters(ResourceBinaryReader reader)
+    {
+        return new DrawIndexedParameters
+        {
+            GeometryPrimitiveType = GeometryPrimitiveTypeConverter.ToKind((D3DPRIMITIVETYPE)reader.ReadUInt32()),
+            BaseVertexIndex = reader.ReadInt32(),
+            StartIndex = reader.ReadUInt32(),
+            IndexCount = reader.ReadUInt32(),
+            MinimumIndex = reader.ReadUInt32(),
+            NumPrimitives = reader.ReadUInt32(),
+        };
+    }
+
     public RenderablePC(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 }

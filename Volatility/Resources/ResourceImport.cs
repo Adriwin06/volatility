@@ -61,7 +61,7 @@ public struct ResourceImport
         // YAP imports yaml
         if (reader.BaseStream is FileStream fs)
         {
-            string baseName = Path.GetFileNameWithoutExtension(fs.Name);
+            string baseName = Path.GetFileNameWithoutExtension(fs.Name).Split(["_primary", "_secondary"], StringSplitOptions.None)[0];
             string directory = Path.GetDirectoryName(fs.Name);
             string yamlPath = Path.Combine(directory, baseName + "_imports.yaml");
 
@@ -98,7 +98,7 @@ public struct ResourceImport
         // YAP imports yaml
         if (reader.BaseStream is FileStream fs)
         {
-            string baseName = Path.GetFileNameWithoutExtension(fs.Name);
+            string baseName = Path.GetFileNameWithoutExtension(fs.Name).Split(["_primary", "_secondary"], StringSplitOptions.None)[0];
             string directory = Path.GetDirectoryName(fs.Name);
             string yamlPath = Path.Combine(directory, baseName + "_imports.yaml");
 

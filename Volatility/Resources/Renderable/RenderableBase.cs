@@ -52,12 +52,29 @@ public abstract class RenderableBase : Resource
             reader.BaseStream.Seek(reader.ReadUInt32(), SeekOrigin.Begin);
             RenderableMesh mesh = new()
             {
-                BoundingBox = MatrixUtilities.ReadMatrix44(reader),
-                // DrawIndexedParameters
-                // MaterialAssembly - ResourceImport.ReadExternalImport
+                BoundingBox = ParseOobb(reader),
+                DrawIndexedParameters = ParseDrawIndexedParameters(reader),
+                MaterialAssembly = ResourceImport.ReadExternalImport(i, reader, (reader.BaseStream.Length - ((numMeshes - 1) * 0x10)), out ResourceImport import)
+                    ? import
+                    : throw new InvalidDataException($"Failed to read MaterialAssembly import at index {i}."),
+                NumVertexDescriptors = reader.ReadByte(),
+                InstanceCount = reader.ReadByte(),
+                NumVertexBuffers = reader.ReadByte(),
+                Flags = reader.ReadByte(),
             };
+            reader.ReadUInt32();
             Meshes.Add(mesh);
         }
+    }
+
+    public virtual DrawIndexedParameters ParseDrawIndexedParameters(ResourceBinaryReader reader)
+    {
+        return new(); // platforms will need to implement this
+    }
+
+    public virtual Matrix44 ParseOobb(ResourceBinaryReader reader)
+    {
+        return MatrixUtilities.ReadMatrix44(reader);
     }
 
     public struct RenderableMesh
@@ -69,6 +86,7 @@ public abstract class RenderableBase : Resource
         public byte InstanceCount;
         public byte NumVertexBuffers;
         public byte Flags;
+        // TODO: buffer data
     }
 
     public struct DrawIndexedParameters

@@ -14,7 +14,7 @@ public enum GeometryPrimitiveType : byte
     Polygon,
     RectList,
 }
-public enum CellPrimitiveType : byte
+public enum CELL_GCM_PRIMITIVE_TYPE : byte
 {
     CELL_GCM_PRIMITIVE_POINTS = 1,
     CELL_GCM_PRIMITIVE_LINE_STRIP = 2,
@@ -26,6 +26,7 @@ public enum CellPrimitiveType : byte
     CELL_GCM_PRIMITIVE_QUADS = 8,
     CELL_GCM_PRIMITIVE_QUAD_STRIP = 9,
     CELL_GCM_PRIMITIVE_POLYGON = 10,
+    END = 0,
 }
 
 public enum D3DPRIMITIVETYPE : UInt32
@@ -89,18 +90,43 @@ public enum D3D11_PRIMITIVE_TOPOLOGY : UInt32
 
 public static class GeometryPrimitiveTypeConverter
 {
-    public static GeometryPrimitiveType ToKind(this CellPrimitiveType v) => v switch
+    public static uint PrimitiveCountFromIndices(GeometryPrimitiveType type, uint indexCount)
     {
-        CellPrimitiveType.CELL_GCM_PRIMITIVE_POINTS => GeometryPrimitiveType.PointList,
-        CellPrimitiveType.CELL_GCM_PRIMITIVE_LINES => GeometryPrimitiveType.LineList,
-        CellPrimitiveType.CELL_GCM_PRIMITIVE_LINE_STRIP => GeometryPrimitiveType.LineStrip,
-        CellPrimitiveType.CELL_GCM_PRIMITIVE_LINE_LOOP => GeometryPrimitiveType.LineLoop,
-        CellPrimitiveType.CELL_GCM_PRIMITIVE_TRIANGLES => GeometryPrimitiveType.TriangleList,
-        CellPrimitiveType.CELL_GCM_PRIMITIVE_TRIANGLE_STRIP => GeometryPrimitiveType.TriangleStrip,
-        CellPrimitiveType.CELL_GCM_PRIMITIVE_TRIANGLE_FAN => GeometryPrimitiveType.TriangleFan,
-        CellPrimitiveType.CELL_GCM_PRIMITIVE_QUADS => GeometryPrimitiveType.QuadList,
-        CellPrimitiveType.CELL_GCM_PRIMITIVE_QUAD_STRIP => GeometryPrimitiveType.QuadStrip,
-        CellPrimitiveType.CELL_GCM_PRIMITIVE_POLYGON => GeometryPrimitiveType.Polygon,
+        if (indexCount <= 0) return 0;
+
+        return type switch
+        {
+            GeometryPrimitiveType.PointList => indexCount,
+
+            GeometryPrimitiveType.LineList => indexCount / 2,
+            GeometryPrimitiveType.LineStrip => indexCount >= 2 ? indexCount - 1 : 0,
+            GeometryPrimitiveType.LineLoop => indexCount >= 2 ? indexCount : 0,
+
+            GeometryPrimitiveType.TriangleList => indexCount / 3,
+            GeometryPrimitiveType.TriangleStrip => indexCount >= 3 ? indexCount - 2 : 0,
+            GeometryPrimitiveType.TriangleFan => indexCount >= 3 ? indexCount - 2 : 0,
+
+            GeometryPrimitiveType.QuadList => indexCount / 4,
+            GeometryPrimitiveType.QuadStrip => indexCount >= 4 ? (indexCount - 2) / 2 : 0,
+
+            GeometryPrimitiveType.RectList => indexCount / 3,
+            GeometryPrimitiveType.Polygon => indexCount >= 3 ? (uint)1 : 0,
+
+            _ => 0
+        };
+    }
+    public static GeometryPrimitiveType ToKind(this CELL_GCM_PRIMITIVE_TYPE v) => v switch
+    {
+        CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_POINTS => GeometryPrimitiveType.PointList,
+        CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_LINES => GeometryPrimitiveType.LineList,
+        CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_LINE_STRIP => GeometryPrimitiveType.LineStrip,
+        CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_LINE_LOOP => GeometryPrimitiveType.LineLoop,
+        CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_TRIANGLES => GeometryPrimitiveType.TriangleList,
+        CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_TRIANGLE_STRIP => GeometryPrimitiveType.TriangleStrip,
+        CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_TRIANGLE_FAN => GeometryPrimitiveType.TriangleFan,
+        CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_QUADS => GeometryPrimitiveType.QuadList,
+        CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_QUAD_STRIP => GeometryPrimitiveType.QuadStrip,
+        CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_POLYGON => GeometryPrimitiveType.Polygon,
         _ => throw new ArgumentOutOfRangeException(nameof(v), v, null),
     };
 
@@ -127,18 +153,18 @@ public static class GeometryPrimitiveTypeConverter
         _ => throw new NotSupportedException($"No Volatility equivalent to {v}"),
     };
 
-    public static CellPrimitiveType ToCell(this GeometryPrimitiveType k) => k switch
+    public static CELL_GCM_PRIMITIVE_TYPE ToCell(this GeometryPrimitiveType k) => k switch
     {
-        GeometryPrimitiveType.PointList => CellPrimitiveType.CELL_GCM_PRIMITIVE_POINTS,
-        GeometryPrimitiveType.LineList => CellPrimitiveType.CELL_GCM_PRIMITIVE_LINES,
-        GeometryPrimitiveType.LineStrip => CellPrimitiveType.CELL_GCM_PRIMITIVE_LINE_STRIP,
-        GeometryPrimitiveType.LineLoop => CellPrimitiveType.CELL_GCM_PRIMITIVE_LINE_LOOP,
-        GeometryPrimitiveType.TriangleList => CellPrimitiveType.CELL_GCM_PRIMITIVE_TRIANGLES,
-        GeometryPrimitiveType.TriangleStrip => CellPrimitiveType.CELL_GCM_PRIMITIVE_TRIANGLE_STRIP,
-        GeometryPrimitiveType.TriangleFan => CellPrimitiveType.CELL_GCM_PRIMITIVE_TRIANGLE_FAN,
-        GeometryPrimitiveType.QuadList => CellPrimitiveType.CELL_GCM_PRIMITIVE_QUADS,
-        GeometryPrimitiveType.QuadStrip => CellPrimitiveType.CELL_GCM_PRIMITIVE_QUAD_STRIP,
-        GeometryPrimitiveType.Polygon => CellPrimitiveType.CELL_GCM_PRIMITIVE_POLYGON,
+        GeometryPrimitiveType.PointList => CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_POINTS,
+        GeometryPrimitiveType.LineList => CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_LINES,
+        GeometryPrimitiveType.LineStrip => CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_LINE_STRIP,
+        GeometryPrimitiveType.LineLoop => CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_LINE_LOOP,
+        GeometryPrimitiveType.TriangleList => CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_TRIANGLES,
+        GeometryPrimitiveType.TriangleStrip => CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_TRIANGLE_STRIP,
+        GeometryPrimitiveType.TriangleFan => CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_TRIANGLE_FAN,
+        GeometryPrimitiveType.QuadList => CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_QUADS,
+        GeometryPrimitiveType.QuadStrip => CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_QUAD_STRIP,
+        GeometryPrimitiveType.Polygon => CELL_GCM_PRIMITIVE_TYPE.CELL_GCM_PRIMITIVE_POLYGON,
         _ => throw new NotSupportedException($"No Cell equivalent to {k}"),
     };
 
@@ -165,8 +191,8 @@ public static class GeometryPrimitiveTypeConverter
         _ => throw new NotSupportedException($"No D3D11 equivalent to {k}"),
     };
 
-    public static D3D11_PRIMITIVE_TOPOLOGY ToD3D11(this CellPrimitiveType v) => v.ToKind().ToD3D11();
-    public static D3DPRIMITIVETYPE ToD3D9(this CellPrimitiveType v) => v.ToKind().ToD3D9();
-    public static CellPrimitiveType ToCell(this D3DPRIMITIVETYPE v) => v.ToKind().ToCell();
-    public static CellPrimitiveType ToCell(this D3D11_PRIMITIVE_TOPOLOGY v) => v.ToKind().ToCell();
+    public static D3D11_PRIMITIVE_TOPOLOGY ToD3D11(this CELL_GCM_PRIMITIVE_TYPE v) => v.ToKind().ToD3D11();
+    public static D3DPRIMITIVETYPE ToD3D9(this CELL_GCM_PRIMITIVE_TYPE v) => v.ToKind().ToD3D9();
+    public static CELL_GCM_PRIMITIVE_TYPE ToCell(this D3DPRIMITIVETYPE v) => v.ToKind().ToCell();
+    public static CELL_GCM_PRIMITIVE_TYPE ToCell(this D3D11_PRIMITIVE_TOPOLOGY v) => v.ToKind().ToCell();
 }

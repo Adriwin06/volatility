@@ -19,5 +19,24 @@ public class RenderableBPR : RenderableBase
         base.ParseFromStream(reader, endianness);
     }
 
+    public override DrawIndexedParameters ParseDrawIndexedParameters(ResourceBinaryReader reader)
+    {
+        GeometryPrimitiveType kind = GeometryPrimitiveTypeConverter.ToKind((D3D11_PRIMITIVE_TOPOLOGY)reader.ReadUInt32());
+        int baseVertexIndex = reader.ReadInt32();
+        uint startIndex = reader.ReadUInt32();
+        uint indexCount = reader.ReadUInt32();
+        uint numPrimitives = GeometryPrimitiveTypeConverter.PrimitiveCountFromIndices(kind, indexCount);
+
+        return new DrawIndexedParameters
+        {
+            GeometryPrimitiveType = kind,
+            BaseVertexIndex = baseVertexIndex,
+            StartIndex = startIndex,
+            IndexCount = indexCount,
+            MinimumIndex = 0,
+            NumPrimitives = numPrimitives
+        };
+    }
+
     public RenderableBPR(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 }
