@@ -2,8 +2,9 @@ using System.Reflection;
 
 using Volatility.Resources;
 
-using static Volatility.Utilities.TypeUtilities;
 using static Volatility.Utilities.ResourceIDUtilities;
+using static Volatility.Utilities.TypeUtilities;
+using static Volatility.Utilities.HexUtilities;
 
 namespace Volatility.CLI.Commands;
 
@@ -12,33 +13,46 @@ internal class AutotestCommand : ICommand
     public static string CommandToken => "autotest";
     public static string CommandDescription => "Runs automatic tests to ensure the application is working." +
         " When provided a path & format, will import, export, then reimport specified file to ensure IO parity.";
-    public static string CommandParameters => "[--format=<tub,bpr,x360,ps3>] [--path=<file path>]";
+    public static string CommandParameters => "[--type=<all,texture,endian,oobb>] [--format=<tub,bpr,x360,ps3>] [--path=<file path>]";
 
     public string? Format { get; set; }
     public string? Path { get; set; }
+    public string? Type { get; set; }
 
     public async Task Execute()
     {
         if (!string.IsNullOrEmpty(Path))
         {
-            TextureBase? header = Format switch
+            switch (Type)
             {
-                "BPR" => new TextureBPR(Path),
-                "TUB" => new TexturePC(Path),
-                "X360" => new TextureX360(Path),
-                "PS3" => new TexturePS3(Path),
-                _ => throw new InvalidPlatformException(),
-            };
-
-            header.PullAll();
-
-            TestHeaderRW($"autotest_{System.IO.Path.GetFileName(Path)}", header);
-
-            return;
+                case "texture":
+                    TextureBase? header = Format switch
+                    {
+                        "BPR" => new TextureBPR(Path),
+                        "TUB" => new TexturePC(Path),
+                        "X360" => new TextureX360(Path),
+                        "PS3" => new TexturePS3(Path),
+                        _ => throw new InvalidPlatformException(),
+                    };
+                    header.PullAll();
+                    TestHeaderRW($"autotest_{System.IO.Path.GetFileName(Path)}", header);
+                    return;
+                case "oobb":
+                    TestOobbRW(System.IO.Path.GetFullPath(Path));
+                    return;
+                case "endian":
+                    Console.WriteLine($"AUTOTEST - Endian Test: Flipped endian {System.IO.Path.GetFileName(Path)} to {FlipPathResourceIDEndian(System.IO.Path.GetFileName(Path))}");
+                    return;
+                case "all":
+                    Console.WriteLine("Specifying a file path with type 'all' is not supported, falling back to standard autotest");
+                    break;
+                default:
+                    break;
+            }
         }
 
         /*
-         * Right now, the autotest simply creates
+         * Right now, the texture autotest simply creates
          * example texture classes akin to what the parser
          * will interpret from an input format, then write
          * them out to various platform formatted header files.
@@ -127,6 +141,7 @@ internal class AutotestCommand : ICommand
     {
         Format = (args.TryGetValue("format", out object? format) ? format as string : "auto").ToUpper();
         Path = args.TryGetValue("path", out object? path) ? path as string : "";
+        Type = args.TryGetValue("type", out object? type) ? type as string : "all";
     }
 
     public void TestHeaderRW(string name, TextureBase header, bool skipImport = false) 
@@ -173,6 +188,39 @@ internal class AutotestCommand : ICommand
             }
 
             TestCompareHeaders(header, newHeader);
+        }
+    }
+
+    public void TestOobbRW(string inPath)
+    {
+        using FileStream fs = new(inPath, FileMode.Open);
+        using BinaryReader reader = new(fs);
+
+        ReadOnlySpan<byte> packedOobb = reader.ReadBytes(0x10);
+
+        Matrix44 unpackedMatrix = PackedOobb.ToMatrix(packedOobb);
+
+        Console.WriteLine($"AUTOTEST - PackedOobb unpacking results:\nInput: ${Convert.ToHexString(packedOobb)}\nOutput (Hex):");
+        PrintMatrixBytes(unpackedMatrix);
+
+        Console.WriteLine($"Output (Numeric):");
+        PrintMatrixNumeric(unpackedMatrix);
+
+        string outPath = $"{System.IO.Path.GetDirectoryName(Path)}{System.IO.Path.DirectorySeparatorChar}autotest_{System.IO.Path.GetFileName(Path)}";
+        try
+        {
+            using FileStream outStream = new(outPath, FileMode.Create);
+            using EndianAwareBinaryWriter writer = new(outStream, Endian.LE);
+            writer.Write(unpackedMatrix);
+
+            Console.WriteLine($"Output written to {outPath}.");
+
+            writer.Close();
+            outStream.Close();
+        }
+        catch (UnauthorizedAccessException) 
+        {
+            Console.WriteLine($"Unable to write autotest output file {outPath}. Please make sure you have the appropriate permissions to write to this path.");
         }
     }
 
