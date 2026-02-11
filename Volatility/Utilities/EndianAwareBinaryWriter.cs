@@ -83,4 +83,11 @@ public class EndianAwareBinaryWriter : BinaryWriter
         base.Write(_endianness == Endian.BE ? EndianUtilities.SwapEndian(value.Z) : value.Z);
         base.Write(_endianness == Endian.BE ? EndianUtilities.SwapEndian(value.W) : value.W);
     }
+    public void Write(Matrix44 value)
+    {
+        Write(value.M11); Write(value.M12); Write(value.M13); Write(value.M14);
+        Write(value.M21); Write(value.M22); Write(value.M23); Write(value.M24);
+        Write(value.M31); Write(value.M32); Write(value.M33); Write(value.M34);
+        Write(value.M41); Write(value.M42); Write(value.M43); Write(value.M44);
+    }
 }
