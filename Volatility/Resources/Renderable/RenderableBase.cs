@@ -34,7 +34,7 @@ public abstract class RenderableBase : Resource
 
         Version = reader.ReadUInt16();
         uint numMeshes = reader.ReadUInt16();
-        uint meshesPtr = reader.ReadUInt32();               // Pointer to a pointer
+        uint meshesPtr = reader.ReadUInt32();                   // Pointer to a pointer
         reader.BaseStream.Seek(0x4, SeekOrigin.Current);    // mpObjectScopeTextureInfo
         using BitReader bitReader = new(reader.ReadBytes(4));
         Flags = bitReader.ReadBitsToBitArray(16);
@@ -67,12 +67,12 @@ public abstract class RenderableBase : Resource
         }
     }
 
-    public virtual DrawIndexedParameters ParseDrawIndexedParameters(ResourceBinaryReader reader)
+    protected virtual DrawIndexedParameters ParseDrawIndexedParameters(ResourceBinaryReader reader)
     {
         return new(); // platforms will need to implement this
     }
 
-    public virtual Matrix44 ParseOobb(ResourceBinaryReader reader)
+    protected virtual Matrix44 ParseOobb(ResourceBinaryReader reader)
     {
         return MatrixUtilities.ReadMatrix44(reader);
     }

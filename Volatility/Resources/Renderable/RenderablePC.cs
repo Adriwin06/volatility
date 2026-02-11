@@ -19,7 +19,7 @@ public class RenderablePC : RenderableBase
         base.ParseFromStream(reader, endianness);
     }
 
-    public override DrawIndexedParameters ParseDrawIndexedParameters(ResourceBinaryReader reader)
+    protected override DrawIndexedParameters ParseDrawIndexedParameters(ResourceBinaryReader reader)
     {
         return new DrawIndexedParameters
         {

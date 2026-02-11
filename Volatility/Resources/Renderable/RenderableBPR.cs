@@ -19,7 +19,7 @@ public class RenderableBPR : RenderableBase
         base.ParseFromStream(reader, endianness);
     }
 
-    public override DrawIndexedParameters ParseDrawIndexedParameters(ResourceBinaryReader reader)
+    protected override DrawIndexedParameters ParseDrawIndexedParameters(ResourceBinaryReader reader)
     {
         GeometryPrimitiveType kind = GeometryPrimitiveTypeConverter.ToKind((D3D11_PRIMITIVE_TOPOLOGY)reader.ReadUInt32());
         int baseVertexIndex = reader.ReadInt32();

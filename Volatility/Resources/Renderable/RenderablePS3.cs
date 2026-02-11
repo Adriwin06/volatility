@@ -5,7 +5,7 @@ public class RenderablePS3 : RenderableBase
     public override Endian GetResourceEndian() => Endian.BE;
     public override Platform GetResourcePlatform() => Platform.PS3;
 
-    public override DrawIndexedParameters ParseDrawIndexedParameters(ResourceBinaryReader reader)
+    protected override DrawIndexedParameters ParseDrawIndexedParameters(ResourceBinaryReader reader)
     {
         uint startIndex = reader.ReadUInt32();
         uint indexCount = reader.ReadUInt32();
@@ -21,6 +21,11 @@ public class RenderablePS3 : RenderableBase
             GeometryPrimitiveType = geometryPrimitiveType
         };
     }
-
+    
+    protected override Matrix44 ParseOobb(ResourceBinaryReader reader)
+    {
+        return PackedOobb.ToMatrix(reader.ReadBytes(0x10));
+    }
+    
     public RenderablePS3(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 }

@@ -1,4 +1,6 @@
-﻿namespace Volatility.Utilities;
+﻿using System.Buffers.Binary;
+
+namespace Volatility.Utilities;
 
 public static class EndianUtilities
 {
@@ -54,5 +56,26 @@ public static class EndianUtilities
         byte[] bytes = BitConverter.GetBytes(value);
         Array.Reverse(bytes);
         return BitConverter.ToDouble(bytes, 0);
+    }
+
+    public static ushort ReadUInt16(ReadOnlySpan<byte> data, int offset, Endian endianness)
+    {
+        if (endianness == Endian.Agnostic)
+            throw new InvalidOperationException("An agnostic endianness was passed to EndianUtilities.ReadUInt16.");
+
+        return endianness == Endian.BE
+            ? BinaryPrimitives.ReadUInt16BigEndian(data.Slice(offset, 2))
+            : BinaryPrimitives.ReadUInt16LittleEndian(data.Slice(offset, 2));
+    }
+
+    public static void WriteUInt16(Span<byte> data, int offset, ushort value, Endian endianness)
+    {
+        if (endianness == Endian.Agnostic)
+            throw new InvalidOperationException("An agnostic endianness was passed to EndianUtilities.WriteUInt16.");
+
+        if (endianness == Endian.BE)
+            BinaryPrimitives.WriteUInt16BigEndian(data.Slice(offset, 2), value);
+        else
+            BinaryPrimitives.WriteUInt16LittleEndian(data.Slice(offset, 2), value);
     }
 }
