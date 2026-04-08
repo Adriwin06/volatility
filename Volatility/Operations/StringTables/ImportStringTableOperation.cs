@@ -1,9 +1,6 @@
 using System.Text;
 using System.Xml.Linq;
 
-using YamlDotNet.Serialization;
-using YamlDotNet.Serialization.NamingConventions;
-
 using static Volatility.Utilities.ResourceIDUtilities;
 using static Volatility.Utilities.DictUtilities;
 
@@ -18,21 +15,14 @@ internal class ImportStringTableOperation
         this.mergeOperation = mergeOperation;
     }
 
-    public async Task ExecuteAsync(IEnumerable<string> filePaths, Dictionary<string, Dictionary<string, StringTableResourceEntry>> entries, string endian, bool overwrite, bool verbose, string yamlFile)
+    public async Task ExecuteAsync(IEnumerable<string> filePaths, Dictionary<string, Dictionary<string, StringTableResourceEntry>> entries, string endian, bool overwrite, bool verbose)
     {
-        var serializer = new SerializerBuilder()
-            .WithNamingConvention(CamelCaseNamingConvention.Instance)
-            .Build();
-
         var results = await Task.WhenAll(filePaths.Select(path => ProcessFileAsync(path, endian, overwrite, verbose)));
 
         foreach (var fileResult in results)
         {
             mergeOperation.Execute(entries, fileResult, overwrite);
         }
-
-        string yaml = serializer.Serialize(entries);
-        await File.WriteAllTextAsync(yamlFile, yaml, Encoding.UTF8);
 
         GC.Collect();
         GC.WaitForPendingFinalizers();
