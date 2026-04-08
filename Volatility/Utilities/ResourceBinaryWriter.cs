@@ -43,6 +43,7 @@ public class ResourceBinaryWriter : EndianAwareBinaryWriter
 
         Write((uint)value);
     }
+
     public void WriteSection<T>(long offset, T data, Action<ResourceBinaryWriter, T> writeItem)
     {
         if (offset == 0)
@@ -152,5 +153,23 @@ public class ResourceBinaryWriter : EndianAwareBinaryWriter
         }
 
         Write(output);
+    }
+
+    public void WriteArchDependInt(int count, Arch arch)
+    {
+        Write(count);
+        if (arch == Arch.x64)
+        {
+            Write(0x00000000);
+        }
+    }
+
+    public void WriteArchDependUInt(uint count, Arch arch)
+    {
+        Write(count);
+        if (arch == Arch.x64)
+        {
+            Write(0x00000000);
+        }
     }
 }

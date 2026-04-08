@@ -1,4 +1,5 @@
 using System.Numerics;
+using System.Reflection.PortableExecutable;
 using Volatility.Utilities;
 
 namespace Volatility.Resources;
@@ -380,16 +381,16 @@ public class StreamedDeformationSpec : Resource
         }
 
         TagPointDataOffset = reader.ReadPointer(arch);
-        NumberOfTagPoints = ReadCount(arch);
+        NumberOfTagPoints = reader.ReadArchDependInt(arch);
         DrivenPointDataOffset = reader.ReadPointer(arch);
-        NumberOfDrivenPoints = ReadCount(reader, arch);
+        NumberOfDrivenPoints = reader.ReadArchDependInt(arch);
         IKPartDataOffset = reader.ReadPointer(arch);
-        NumberOfIKParts = ReadCount(reader, arch);
+        NumberOfIKParts = reader.ReadArchDependInt(arch);
         GlassPaneDataOffset = reader.ReadPointer(arch);
-        NumGlassPanes = ReadCount(reader, arch);
-        GenericTagsInfo = new LocatorPointSpecList(reader, arch);
-        CameraTagsInfo = new LocatorPointSpecList(reader, arch);
-        LightTagsInfo = new LocatorPointSpecList(reader, arch);
+        NumGlassPanes = reader.ReadArchDependInt(arch);
+        GenericTagsInfo = new(reader, arch);
+        CameraTagsInfo = new (reader, arch);
+        LightTagsInfo = new(reader, arch);
 
         reader.BaseStream.Seek(arch == Arch.x64 ? 0x8 : 0x4, SeekOrigin.Current);
 
@@ -509,13 +510,13 @@ public class StreamedDeformationSpec : Resource
         }
 
         writer.WritePointer(TagPointDataOffset, arch);
-        WriteCount(writer, NumberOfTagPoints, arch);
+        writer.WriteArchDependInt(NumberOfTagPoints, arch);
         writer.WritePointer(DrivenPointDataOffset, arch);
-        WriteCount(writer, NumberOfDrivenPoints, arch);
+        writer.WriteArchDependInt(NumberOfDrivenPoints, arch);
         writer.WritePointer(IKPartDataOffset, arch);
-        WriteCount(writer, NumberOfIKParts, arch);
+        writer.WriteArchDependInt(NumberOfIKParts, arch);
         writer.WritePointer(GlassPaneDataOffset, arch);
-        WriteCount(writer, NumGlassPanes, arch);
+        writer.WriteArchDependInt(NumGlassPanes, arch);
         WriteLocatorPointSpecList(writer, GenericTagsInfo, arch);
         WriteLocatorPointSpecList(writer, CameraTagsInfo, arch);
         WriteLocatorPointSpecList(writer, LightTagsInfo, arch);
@@ -580,16 +581,6 @@ public class StreamedDeformationSpec : Resource
     public StreamedDeformationSpec() : base() { }
 
     public StreamedDeformationSpec(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
-
-    // Honestly not sure if this count formatting is used anywhere else - move it to generic boilerplate if so?
-    private static void WriteArchCount(ResourceBinaryWriter writer, int count, Arch arch)
-    {
-        writer.Write(count);
-        if (arch == Arch.x64)
-        {
-            writer.Write(0x00000000);
-        }
-    }
 
     // Section writers
 
