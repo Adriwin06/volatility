@@ -136,23 +136,23 @@ public class ResourceBinaryReader : EndianAwareBinaryReader
         }
     }
 
-    public static int ReadArchDependInt(ResourceBinaryReader reader, Arch arch)
+    public int ReadArchDependInt(Arch arch)
     {
-        int value = reader.ReadInt32();
+        int value = ReadInt32();
         if (arch == Arch.x64)
         {
-            reader.BaseStream.Seek(0x4, SeekOrigin.Current);
+            BaseStream.Seek(0x4, SeekOrigin.Current);
         }
 
         return value;
     }
 
-    public static uint ReadArchDependUInt(ResourceBinaryReader reader, Arch arch)
+    public uint ReadArchDependUInt(Arch arch)
     {
-        uint value = reader.ReadUInt32();
+        uint value = ReadUInt32();
         if (arch == Arch.x64)
         {
-            reader.BaseStream.Seek(0x4, SeekOrigin.Current);
+            BaseStream.Seek(0x4, SeekOrigin.Current);
         }
 
         return value;
