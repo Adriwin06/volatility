@@ -10,18 +10,6 @@ namespace Volatility.Resources;
 // Learn More:
 // https://burnout.wiki/wiki/Streamed_Deformation
 
-public struct DeformationVector3Plus
-{
-    public Vector3 Vector;
-    public float Extra;
-
-    public DeformationVector3Plus(ResourceBinaryReader reader)
-    {
-        Vector = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
-        Extra = reader.ReadSingle();
-    }
-}
-
 public struct WheelSpec
 {
     public const int Size = 0x30;
@@ -74,9 +62,9 @@ public struct TagPointSpec
 {
     public const int Size = 0x50;
 
-    public DeformationVector3Plus OffsetFromAAndWeightA;
-    public DeformationVector3Plus OffsetFromBAndWeightB;
-    public DeformationVector3Plus InitialPositionAndDetachThreshold;
+    public Vector3Plus OffsetFromAAndWeightA;
+    public Vector3Plus OffsetFromBAndWeightB;
+    public Vector3Plus InitialPositionAndDetachThreshold;
     public float WeightA;
     public float WeightB;
     public float DetachThresholdSquared;
@@ -87,9 +75,9 @@ public struct TagPointSpec
 
     public TagPointSpec(ResourceBinaryReader reader)
     {
-        OffsetFromAAndWeightA = new DeformationVector3Plus(reader);
-        OffsetFromBAndWeightB = new DeformationVector3Plus(reader);
-        InitialPositionAndDetachThreshold = new DeformationVector3Plus(reader);
+        OffsetFromAAndWeightA = reader.ReadVector3Plus();
+        OffsetFromBAndWeightB = reader.ReadVector3Plus();
+        InitialPositionAndDetachThreshold = reader.ReadVector3Plus();
         WeightA = reader.ReadSingle();
         WeightB = reader.ReadSingle();
         DetachThresholdSquared = reader.ReadSingle();
@@ -133,7 +121,7 @@ public struct LocatorPointSpec
 
     public LocatorPointSpec(ResourceBinaryReader reader)
     {
-        LocatorMatrix = reader.ReadMatrix4x4();
+        LocatorMatrix = MatrixUtilities.ReadMatrix44(reader);
         TagPointType = reader.ReadInt32();
         IkPartIndex = reader.ReadInt16();
         SkinPoint = reader.ReadByte();
@@ -194,7 +182,7 @@ public struct BodyPartBBoxSpec
 
     public BodyPartBBoxSpec(ResourceBinaryReader reader)
     {
-        Orientation = reader.ReadMatrix4x4();
+        Orientation = MatrixUtilities.ReadMatrix44(reader);
 
         CornerSkinData = new List<BBoxPointSkinData>(8);
         for (int i = 0; i < 8; i++)
@@ -250,9 +238,9 @@ public struct IKBodyPartSpec
     {
         long structStart = reader.BaseStream.Position;
 
-        GraphicsTransform = reader.ReadMatrix4x4();
+        GraphicsTransform = MatrixUtilities.ReadMatrix44(reader);
         BBoxSkinData = new BodyPartBBoxSpec(reader);
-        JointSpecsOffset = StreamedDeformationSpec.ReadPointer(reader, arch);
+        JointSpecsOffset = reader.ReadPointer(arch);
         NumJoints = reader.ReadInt32();
         PartGraphics = reader.ReadInt32();
         StartIndexOfDrivenPoints = reader.ReadInt32();
@@ -329,7 +317,7 @@ public class StreamedDeformationSpec : Resource
     public const int HeaderSize64 = 0x6F0;
     private const int SectionAlignment = 0x10;
 
-    public override ResourceType GetResourceType() => ResourceType.StreamedDeformationSpec;
+    public override ResourceType ResourceType => ResourceType.StreamedDeformationSpec;
 
     public int VersionNumber { get; set; }
     public ulong TagPointDataOffset { get; set; }
@@ -378,7 +366,7 @@ public class StreamedDeformationSpec : Resource
         IKParts.Clear();
         GlassPanes.Clear();
 
-        Arch arch = GetResourceArch();
+        Arch arch = ResourceArch;
 
         VersionNumber = reader.ReadInt32();
         if (VersionNumber != 1)
@@ -391,13 +379,13 @@ public class StreamedDeformationSpec : Resource
             reader.BaseStream.Seek(0x4, SeekOrigin.Current);
         }
 
-        TagPointDataOffset = ReadPointer(reader, arch);
-        NumberOfTagPoints = ReadCount(reader, arch);
-        DrivenPointDataOffset = ReadPointer(reader, arch);
+        TagPointDataOffset = reader.ReadPointer(arch);
+        NumberOfTagPoints = ReadCount(arch);
+        DrivenPointDataOffset = reader.ReadPointer(arch);
         NumberOfDrivenPoints = ReadCount(reader, arch);
-        IKPartDataOffset = ReadPointer(reader, arch);
+        IKPartDataOffset = reader.ReadPointer(arch);
         NumberOfIKParts = ReadCount(reader, arch);
-        GlassPaneDataOffset = ReadPointer(reader, arch);
+        GlassPaneDataOffset = reader.ReadPointer(arch);
         NumGlassPanes = ReadCount(reader, arch);
         GenericTagsInfo = new LocatorPointSpecList(reader, arch);
         CameraTagsInfo = new LocatorPointSpecList(reader, arch);
@@ -417,7 +405,7 @@ public class StreamedDeformationSpec : Resource
             DeformationSensorSpecs.Add(new SensorSpec(reader));
         }
 
-        CarModelSpaceToHandlingBodySpaceTransform = reader.ReadMatrix4x4();
+        CarModelSpaceToHandlingBodySpaceTransform = MatrixUtilities.ReadMatrix44(reader);
 
         SpecID = reader.ReadByte();
         NumVehicleBodies = reader.ReadByte();
@@ -431,20 +419,20 @@ public class StreamedDeformationSpec : Resource
         CollisionOffset = reader.ReadVector3();
         InertiaTensor = reader.ReadVector3();
 
-        ParseSection(reader, TagPointDataOffset, NumberOfTagPoints, r => new TagPointSpec(r), TagPointSpecs);
-        ParseSection(reader, DrivenPointDataOffset, NumberOfDrivenPoints, r => new IKDrivenPointSpec(r), DrivenPoints);
-        ParseSection(reader, GenericTagsInfo.Offset, (int)GenericTagsInfo.Count, r => new LocatorPointSpec(r), GenericTags);
-        ParseSection(reader, CameraTagsInfo.Offset, (int)CameraTagsInfo.Count, r => new LocatorPointSpec(r), CameraTags);
-        ParseSection(reader, LightTagsInfo.Offset, (int)LightTagsInfo.Count, r => new LocatorPointSpec(r), LightTags);
-        ParseSection(reader, GlassPaneDataOffset, NumGlassPanes, r => new GlassPaneSpec(r), GlassPanes);
-        ParseSection(reader, IKPartDataOffset, NumberOfIKParts, r => new IKBodyPartSpec(r, arch), IKParts);
+        reader.ParseSection(TagPointDataOffset, NumberOfTagPoints, r => new TagPointSpec(r), TagPointSpecs);
+        reader.ParseSection(DrivenPointDataOffset, NumberOfDrivenPoints, r => new IKDrivenPointSpec(r), DrivenPoints);
+        reader.ParseSection(GenericTagsInfo.Offset, (int)GenericTagsInfo.Count, r => new LocatorPointSpec(r), GenericTags);
+        reader.ParseSection(CameraTagsInfo.Offset, (int)CameraTagsInfo.Count, r => new LocatorPointSpec(r), CameraTags);
+        reader.ParseSection(LightTagsInfo.Offset, (int)LightTagsInfo.Count, r => new LocatorPointSpec(r), LightTags);
+        reader.ParseSection(GlassPaneDataOffset, NumGlassPanes, r => new GlassPaneSpec(r), GlassPanes);
+        reader.ParseSection(IKPartDataOffset, NumberOfIKParts, r => new IKBodyPartSpec(r, arch), IKParts);
     }
 
-    public override void WriteToStream(EndianAwareBinaryWriter writer, Endian endianness = Endian.Agnostic)
+    public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness = Endian.Agnostic)
     {
         base.WriteToStream(writer, endianness);
 
-        Arch arch = GetResourceArch();
+        Arch arch = ResourceArch;
         int headerSize = arch == Arch.x64 ? HeaderSize64 : HeaderSize32;
         int ikPartStructSize = IKBodyPartSpec.GetSize(arch);
 
@@ -468,8 +456,8 @@ public class StreamedDeformationSpec : Resource
             throw new InvalidDataException($"StreamedDeformationSpec only supports 20 sensor specs. Found {DeformationSensorSpecs.Count}.");
         }
 
-        List<WheelSpec> wheelSpecs = GetFixedSizeList(WheelSpecs, 4);
-        List<SensorSpec> sensorSpecs = GetFixedSizeList(DeformationSensorSpecs, 20);
+        List<WheelSpec> wheelSpecs = ResourceUtilities.GetFixedSizeList(WheelSpecs, 4);
+        List<SensorSpec> sensorSpecs = ResourceUtilities.GetFixedSizeList(DeformationSensorSpecs, 20);
 
         NumberOfTagPoints = TagPointSpecs.Count;
         NumberOfDrivenPoints = DrivenPoints.Count;
@@ -478,9 +466,9 @@ public class StreamedDeformationSpec : Resource
 
         long currentOffset = headerSize;
 
-        TagPointDataOffset = GetSectionOffset(ref currentOffset, NumberOfTagPoints, TagPointSpec.Size);
-        DrivenPointDataOffset = GetSectionOffset(ref currentOffset, NumberOfDrivenPoints, IKDrivenPointSpec.Size);
-        IKPartDataOffset = GetSectionOffset(ref currentOffset, NumberOfIKParts, ikPartStructSize);
+        TagPointDataOffset = ResourceUtilities.GetSectionOffset(ref currentOffset, NumberOfTagPoints, TagPointSpec.Size, SectionAlignment);
+        DrivenPointDataOffset = ResourceUtilities.GetSectionOffset(ref currentOffset, NumberOfDrivenPoints, IKDrivenPointSpec.Size, SectionAlignment);
+        IKPartDataOffset = ResourceUtilities.GetSectionOffset(ref currentOffset, NumberOfIKParts, ikPartStructSize, SectionAlignment);
 
         ulong[] jointSpecOffsets = new ulong[IKParts.Count];
         for (int i = 0; i < IKParts.Count; i++)
@@ -488,30 +476,30 @@ public class StreamedDeformationSpec : Resource
             int jointCount = IKParts[i].JointSpecs?.Count ?? 0;
             if (jointCount > 0)
             {
-                currentOffset = AlignOffset(currentOffset, SectionAlignment);
+                currentOffset = ResourceUtilities.AlignOffset(currentOffset, SectionAlignment);
                 jointSpecOffsets[i] = (ulong)currentOffset;
                 currentOffset += jointCount * DeformationJointSpec.Size;
             }
         }
 
-        currentOffset = AlignOffset(currentOffset, SectionAlignment);
+        currentOffset = ResourceUtilities.AlignOffset(currentOffset, SectionAlignment);
 
-        GlassPaneDataOffset = GetSectionOffset(ref currentOffset, NumGlassPanes, GlassPaneSpec.Size);
+        GlassPaneDataOffset = ResourceUtilities.GetSectionOffset(ref currentOffset, NumGlassPanes, GlassPaneSpec.Size, SectionAlignment);
 
         GenericTagsInfo = new LocatorPointSpecList
         {
             Count = (uint)GenericTags.Count,
-            Offset = GetSectionOffset(ref currentOffset, GenericTags.Count, LocatorPointSpec.Size)
+            Offset = ResourceUtilities.GetSectionOffset(ref currentOffset, GenericTags.Count, LocatorPointSpec.Size, SectionAlignment)
         };
         CameraTagsInfo = new LocatorPointSpecList
         {
             Count = (uint)CameraTags.Count,
-            Offset = GetSectionOffset(ref currentOffset, CameraTags.Count, LocatorPointSpec.Size)
+            Offset = ResourceUtilities.GetSectionOffset(ref currentOffset, CameraTags.Count, LocatorPointSpec.Size, SectionAlignment)
         };
         LightTagsInfo = new LocatorPointSpecList
         {
             Count = (uint)LightTags.Count,
-            Offset = GetSectionOffset(ref currentOffset, LightTags.Count, LocatorPointSpec.Size)
+            Offset = ResourceUtilities.GetSectionOffset(ref currentOffset, LightTags.Count, LocatorPointSpec.Size, SectionAlignment)
         };
 
         writer.Write(VersionNumber);
@@ -520,19 +508,19 @@ public class StreamedDeformationSpec : Resource
             writer.Write(new byte[0x4]);
         }
 
-        WritePointer(writer, TagPointDataOffset, arch);
+        writer.WritePointer(TagPointDataOffset, arch);
         WriteCount(writer, NumberOfTagPoints, arch);
-        WritePointer(writer, DrivenPointDataOffset, arch);
+        writer.WritePointer(DrivenPointDataOffset, arch);
         WriteCount(writer, NumberOfDrivenPoints, arch);
-        WritePointer(writer, IKPartDataOffset, arch);
+        writer.WritePointer(IKPartDataOffset, arch);
         WriteCount(writer, NumberOfIKParts, arch);
-        WritePointer(writer, GlassPaneDataOffset, arch);
+        writer.WritePointer(GlassPaneDataOffset, arch);
         WriteCount(writer, NumGlassPanes, arch);
         WriteLocatorPointSpecList(writer, GenericTagsInfo, arch);
         WriteLocatorPointSpecList(writer, CameraTagsInfo, arch);
         WriteLocatorPointSpecList(writer, LightTagsInfo, arch);
 
-        writer.Write(new byte[arch == Arch.x64 ? 0x8 : 0x4]);
+        writer.WritePointer(0, arch);
         writer.Write(HandlingBodyDimensions, intrinsic: true);
 
         for (int i = 0; i < wheelSpecs.Count; i++)
@@ -545,7 +533,7 @@ public class StreamedDeformationSpec : Resource
             WriteSensorSpec(writer, sensorSpecs[i]);
         }
 
-        writer.WriteMatrix4x4(CarModelSpaceToHandlingBodySpaceTransform);
+        MatrixUtilities.WriteMatrix44(writer, CarModelSpaceToHandlingBodySpaceTransform);
 
         writer.Write(SpecID);
         writer.Write(NumVehicleBodies);
@@ -564,9 +552,9 @@ public class StreamedDeformationSpec : Resource
             throw new InvalidDataException($"Header size mismatch while writing StreamedDeformationSpec. Expected 0x{headerSize:X}, wrote 0x{writer.BaseStream.Position:X}.");
         }
 
-        WriteSection(writer, TagPointDataOffset, TagPointSpecs, WriteTagPointSpec);
-        WriteSection(writer, DrivenPointDataOffset, DrivenPoints, WriteIKDrivenPointSpec);
-        WriteSection(writer, IKPartDataOffset, IKParts, (w, part, index) => WriteIKBodyPartSpec(w, part, arch, jointSpecOffsets[index]));
+        writer.WriteSection(TagPointDataOffset, TagPointSpecs, WriteTagPointSpec);
+        writer.WriteSection(DrivenPointDataOffset, DrivenPoints, WriteIKDrivenPointSpec);
+        writer.WriteSection(IKPartDataOffset, IKParts, (w, part, index) => WriteIKBodyPartSpec(w, part, arch, jointSpecOffsets[index]));
 
         for (int i = 0; i < IKParts.Count; i++)
         {
@@ -583,105 +571,29 @@ public class StreamedDeformationSpec : Resource
             }
         }
 
-        WriteSection(writer, GlassPaneDataOffset, GlassPanes, WriteGlassPaneSpec);
-        WriteSection(writer, GenericTagsInfo.Offset, GenericTags, WriteLocatorPointSpec);
-        WriteSection(writer, CameraTagsInfo.Offset, CameraTags, WriteLocatorPointSpec);
-        WriteSection(writer, LightTagsInfo.Offset, LightTags, WriteLocatorPointSpec);
+        writer.WriteSection(GlassPaneDataOffset, GlassPanes, WriteGlassPaneSpec);
+        writer.WriteSection(GenericTagsInfo.Offset, GenericTags, WriteLocatorPointSpec);
+        writer.WriteSection(CameraTagsInfo.Offset, CameraTags, WriteLocatorPointSpec);
+        writer.WriteSection(LightTagsInfo.Offset, LightTags, WriteLocatorPointSpec);
     }
 
     public StreamedDeformationSpec() : base() { }
 
     public StreamedDeformationSpec(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 
-    internal static ulong ReadPointer(ResourceBinaryReader reader, Arch arch)
-    {
-        return arch == Arch.x64 ? reader.ReadUInt64() : reader.ReadUInt32();
-    }
-
-    private static int ReadCount(ResourceBinaryReader reader, Arch arch)
-    {
-        int count = reader.ReadInt32();
-        if (arch == Arch.x64)
-        {
-            reader.BaseStream.Seek(0x4, SeekOrigin.Current);
-        }
-
-        return count;
-    }
-
-    private static void ParseSection<T>(ResourceBinaryReader reader, ulong offset, int count, Func<ResourceBinaryReader, T> parser, List<T> destination)
-    {
-        if (count <= 0 || offset == 0)
-        {
-            return;
-        }
-
-        long originalPosition = reader.BaseStream.Position;
-        reader.BaseStream.Seek((long)offset, SeekOrigin.Begin);
-
-        for (int i = 0; i < count; i++)
-        {
-            destination.Add(parser(reader));
-        }
-
-        reader.BaseStream.Seek(originalPosition, SeekOrigin.Begin);
-    }
-
-    private static List<T> GetFixedSizeList<T>(List<T> source, int size)
-    {
-        List<T> output = new(size);
-        for (int i = 0; i < size; i++)
-        {
-            output.Add(i < source.Count ? source[i] : default!);
-        }
-
-        return output;
-    }
-
-    private static long AlignOffset(long offset, int alignment)
-    {
-        return PaddingUtilities.GetPaddedLength(offset, alignment);
-    }
-
-    private static ulong GetSectionOffset(ref long currentOffset, int count, int elementSize)
-    {
-        if (count <= 0)
-        {
-            return 0;
-        }
-
-        currentOffset = AlignOffset(currentOffset, SectionAlignment);
-        ulong offset = (ulong)currentOffset;
-        currentOffset += (long)count * elementSize;
-        return offset;
-    }
-
-    private static void WritePointer(EndianAwareBinaryWriter writer, ulong value, Arch arch)
-    {
-        if (arch == Arch.x64)
-        {
-            writer.Write(value);
-            return;
-        }
-
-        if (value > uint.MaxValue)
-        {
-            throw new InvalidDataException($"Pointer value 0x{value:X} does not fit in a 32-bit StreamedDeformationSpec.");
-        }
-
-        writer.Write((uint)value);
-    }
-
-    private static void WriteCount(EndianAwareBinaryWriter writer, int count, Arch arch)
+    // Honestly not sure if this count formatting is used anywhere else - move it to generic boilerplate if so?
+    private static void WriteArchCount(ResourceBinaryWriter writer, int count, Arch arch)
     {
         writer.Write(count);
         if (arch == Arch.x64)
         {
-            writer.Write(0);
+            writer.Write(0x00000000);
         }
     }
 
-    private static void WriteLocatorPointSpecList(EndianAwareBinaryWriter writer, LocatorPointSpecList value, Arch arch)
+    // Section writers
+
+    private static void WriteLocatorPointSpecList(ResourceBinaryWriter writer, LocatorPointSpecList value, Arch arch)
     {
         writer.Write(value.Count);
         if (arch == Arch.x64)
@@ -700,35 +612,7 @@ public class StreamedDeformationSpec : Resource
         }
     }
 
-    private static void WriteSection<T>(EndianAwareBinaryWriter writer, ulong offset, List<T> data, Action<EndianAwareBinaryWriter, T> writeItem)
-    {
-        if (offset == 0 || data.Count == 0)
-        {
-            return;
-        }
-
-        writer.BaseStream.Position = (long)offset;
-        for (int i = 0; i < data.Count; i++)
-        {
-            writeItem(writer, data[i]);
-        }
-    }
-
-    private static void WriteSection<T>(EndianAwareBinaryWriter writer, ulong offset, List<T> data, Action<EndianAwareBinaryWriter, T, int> writeItem)
-    {
-        if (offset == 0 || data.Count == 0)
-        {
-            return;
-        }
-
-        writer.BaseStream.Position = (long)offset;
-        for (int i = 0; i < data.Count; i++)
-        {
-            writeItem(writer, data[i], i);
-        }
-    }
-
-    private static void WriteWheelSpec(EndianAwareBinaryWriter writer, WheelSpec value)
+    private static void WriteWheelSpec(ResourceBinaryWriter writer, WheelSpec value)
     {
         writer.Write(value.Position, intrinsic: true);
         writer.Write(value.Scale, intrinsic: true);
@@ -736,7 +620,7 @@ public class StreamedDeformationSpec : Resource
         writer.Write(new byte[0xC]);
     }
 
-    private static void WriteSensorSpec(EndianAwareBinaryWriter writer, SensorSpec value)
+    private static void WriteSensorSpec(ResourceBinaryWriter writer, SensorSpec value)
     {
         writer.Write(value.InitialOffset, intrinsic: true);
 
@@ -746,18 +630,18 @@ public class StreamedDeformationSpec : Resource
         }
 
         writer.Write(value.Radius);
-        WriteFixedBytes(writer, value.NextSensor, 6);
+        writer.WriteFixedBytes(value.NextSensor, 6);
         writer.Write(value.SceneIndex);
         writer.Write(value.AbsorbtionLevel);
-        WriteFixedBytes(writer, value.NextBoundarySensor, 2);
+        writer.WriteFixedBytes(value.NextBoundarySensor, 2);
         writer.Write(new byte[0xA]);
     }
 
-    private static void WriteTagPointSpec(EndianAwareBinaryWriter writer, TagPointSpec value)
+    private static void WriteTagPointSpec(ResourceBinaryWriter writer, TagPointSpec value)
     {
-        WriteDeformationVector3Plus(writer, value.OffsetFromAAndWeightA);
-        WriteDeformationVector3Plus(writer, value.OffsetFromBAndWeightB);
-        WriteDeformationVector3Plus(writer, value.InitialPositionAndDetachThreshold);
+        writer.Write(value.OffsetFromAAndWeightA);
+        writer.Write(value.OffsetFromBAndWeightB);
+        writer.Write(value.InitialPositionAndDetachThreshold);
         writer.Write(value.WeightA);
         writer.Write(value.WeightB);
         writer.Write(value.DetachThresholdSquared);
@@ -768,15 +652,7 @@ public class StreamedDeformationSpec : Resource
         writer.Write(new byte[0xE]);
     }
 
-    private static void WriteDeformationVector3Plus(EndianAwareBinaryWriter writer, DeformationVector3Plus value)
-    {
-        writer.Write(value.Vector.X);
-        writer.Write(value.Vector.Y);
-        writer.Write(value.Vector.Z);
-        writer.Write(value.Extra);
-    }
-
-    private static void WriteIKDrivenPointSpec(EndianAwareBinaryWriter writer, IKDrivenPointSpec value)
+    private static void WriteIKDrivenPointSpec(ResourceBinaryWriter writer, IKDrivenPointSpec value)
     {
         writer.Write(value.InitialPos, intrinsic: true);
         writer.Write(value.DistanceFromA);
@@ -786,20 +662,20 @@ public class StreamedDeformationSpec : Resource
         writer.Write(new byte[0x4]);
     }
 
-    private static void WriteLocatorPointSpec(EndianAwareBinaryWriter writer, LocatorPointSpec value)
+    private static void WriteLocatorPointSpec(ResourceBinaryWriter writer, LocatorPointSpec value)
     {
-        writer.WriteMatrix4x4(value.LocatorMatrix);
+        MatrixUtilities.WriteMatrix44(writer, value.LocatorMatrix);
         writer.Write(value.TagPointType);
         writer.Write(value.IkPartIndex);
         writer.Write(value.SkinPoint);
         writer.Write(new byte[0x9]);
     }
 
-    private static void WriteIKBodyPartSpec(EndianAwareBinaryWriter writer, IKBodyPartSpec value, Arch arch, ulong jointSpecsOffset)
+    private static void WriteIKBodyPartSpec(ResourceBinaryWriter writer, IKBodyPartSpec value, Arch arch, ulong jointSpecsOffset)
     {
-        writer.WriteMatrix4x4(value.GraphicsTransform);
+        MatrixUtilities.WriteMatrix44(writer, value.GraphicsTransform);
         WriteBodyPartBBoxSpec(writer, value.BBoxSkinData);
-        WritePointer(writer, jointSpecsOffset, arch);
+        writer.WritePointer(jointSpecsOffset, arch);
         writer.Write(value.JointSpecs?.Count ?? 0);
         writer.Write(value.PartGraphics);
         writer.Write(value.StartIndexOfDrivenPoints);
@@ -809,9 +685,9 @@ public class StreamedDeformationSpec : Resource
         writer.Write(value.PartType);
     }
 
-    private static void WriteBodyPartBBoxSpec(EndianAwareBinaryWriter writer, BodyPartBBoxSpec value)
+    private static void WriteBodyPartBBoxSpec(ResourceBinaryWriter writer, BodyPartBBoxSpec value)
     {
-        writer.WriteMatrix4x4(value.Orientation);
+        MatrixUtilities.WriteMatrix44(writer, value.Orientation);
 
         for (int i = 0; i < 8; i++)
         {
@@ -825,7 +701,7 @@ public class StreamedDeformationSpec : Resource
         WriteBBoxPointSkinData(writer, value.JointSkinData);
     }
 
-    private static void WriteBBoxPointSkinData(EndianAwareBinaryWriter writer, BBoxPointSkinData value)
+    private static void WriteBBoxPointSkinData(ResourceBinaryWriter writer, BBoxPointSkinData value)
     {
         writer.Write(value.Vertex, intrinsic: true);
 
@@ -834,11 +710,11 @@ public class StreamedDeformationSpec : Resource
             writer.Write(i < value.Weights?.Length ? value.Weights[i] : 0f);
         }
 
-        WriteFixedBytes(writer, value.BoneIndices, 3);
+        writer.WriteFixedBytes(value.BoneIndices, 3);
         writer.Write((byte)0);
     }
 
-    private static void WriteDeformationJointSpec(EndianAwareBinaryWriter writer, DeformationJointSpec value)
+    private static void WriteDeformationJointSpec(ResourceBinaryWriter writer, DeformationJointSpec value)
     {
         writer.Write(value.JointPosition, intrinsic: true);
         writer.Write(value.JointAxis, intrinsic: true);
@@ -849,7 +725,7 @@ public class StreamedDeformationSpec : Resource
         writer.Write(new byte[0x4]);
     }
 
-    private static void WriteGlassPaneSpec(EndianAwareBinaryWriter writer, GlassPaneSpec value)
+    private static void WriteGlassPaneSpec(ResourceBinaryWriter writer, GlassPaneSpec value)
     {
         writer.Write(value.Normal, intrinsic: true);
 
@@ -874,52 +750,5 @@ public class StreamedDeformationSpec : Resource
         writer.Write(new byte[0x2]);
         writer.Write(value.PartType);
         writer.Write(new byte[0x8]);
-    }
-
-    private static void WriteFixedBytes(EndianAwareBinaryWriter writer, byte[]? data, int count)
-    {
-        byte[] output = new byte[count];
-        if (data != null)
-        {
-            Array.Copy(data, output, Math.Min(data.Length, count));
-        }
-
-        writer.Write(output);
-    }
-}
-
-public static class ResourceBinaryReaderExtensions
-{
-    public static Matrix4x4 ReadMatrix4x4(this ResourceBinaryReader reader)
-    {
-        return new Matrix4x4(
-            reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(),
-            reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(),
-            reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(),
-            reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle()
-        );
-    }
-}
-
-public static class EndianAwareBinaryWriterExtensions
-{
-    public static void WriteMatrix4x4(this EndianAwareBinaryWriter writer, Matrix4x4 value)
-    {
-        writer.Write(value.M11);
-        writer.Write(value.M12);
-        writer.Write(value.M13);
-        writer.Write(value.M14);
-        writer.Write(value.M21);
-        writer.Write(value.M22);
-        writer.Write(value.M23);
-        writer.Write(value.M24);
-        writer.Write(value.M31);
-        writer.Write(value.M32);
-        writer.Write(value.M33);
-        writer.Write(value.M34);
-        writer.Write(value.M41);
-        writer.Write(value.M42);
-        writer.Write(value.M43);
-        writer.Write(value.M44);
     }
 }
