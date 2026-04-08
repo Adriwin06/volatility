@@ -17,7 +17,7 @@ internal class HelpCommand : ICommand
     {
         if (!string.IsNullOrEmpty(WantedCommand))
         {
-            Frontend.Commands.TryGetValue(WantedCommand, out Type? command);
+            Frontend.Commands.TryGetValue(WantedCommand.ToLowerInvariant(), out Type? command);
             if (command != null)
             {
                 ConstructorInfo? constructor = command.GetConstructor(Array.Empty<Type>());
