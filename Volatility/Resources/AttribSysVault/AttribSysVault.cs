@@ -11,8 +11,8 @@ namespace Volatility.Resources;
 
 public class AttribSysVault : Resource
 {
-    public override ResourceType GetResourceType() => ResourceType.AttribSysVault;
-    public override Platform GetResourcePlatform() => Platform.Agnostic;
+    public override ResourceType ResourceType => ResourceType.AttribSysVault;
+    public override Platform ResourcePlatform => Platform.Agnostic;
 
     public ulong VltDataOffset { get; set; }
     public uint VltSizeInBytes { get; set; }
@@ -76,7 +76,7 @@ public class AttribSysVault : Resource
         PtrN = [];
         Data = string.Empty;
 
-        Arch arch = GetResourceArch();
+        Arch arch = ResourceArch;
         if (arch == Arch.x64)
         {
             VltDataOffset = reader.ReadUInt64();
@@ -104,18 +104,18 @@ public class AttribSysVault : Resource
         reader.BaseStream.Position = originalPosition;
 
         List<PendingAttribute> pendingAttributes = [];
-        using (EndianAwareBinaryReader vltReader = new(new MemoryStream(vltBytes, writable: false), reader.GetEndianness()))
+        using (EndianAwareBinaryReader vltReader = new(new MemoryStream(vltBytes, writable: false), reader.Endianness))
         {
             ParseVlt(vltReader, pendingAttributes);
         }
 
-        using (EndianAwareBinaryReader binReader = new(new MemoryStream(binBytes, writable: false), reader.GetEndianness()))
+        using (EndianAwareBinaryReader binReader = new(new MemoryStream(binBytes, writable: false), reader.Endianness))
         {
             ParseBin(binReader, pendingAttributes);
         }
     }
 
-    public override void WriteToStream(EndianAwareBinaryWriter writer, Endian endianness = Endian.Agnostic)
+    public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness = Endian.Agnostic)
     {
         base.WriteToStream(writer, endianness);
         throw new NotImplementedException("Writing AttribSysVault is not implemented.");
