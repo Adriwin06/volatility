@@ -176,6 +176,7 @@ internal class Frontend
         { "autotest", typeof(AutotestCommand) },
         { "help", typeof(HelpCommand) },
         { "porttexture", typeof(PortTextureCommand) },
+        { "texturetodds", typeof(TextureToDDSCommand) },
         { "importstringtable", typeof(ImportStringTableCommand) },
     };
 }

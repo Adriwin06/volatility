@@ -140,19 +140,21 @@ internal class X360TextureUtilities
         {
             outPath = textureBitmapPath;
         }
-        if (xboxHeader.Format.Tiled)
+        if (!xboxHeader.Format.Tiled)
         {
-            FileStream stream = new FileStream(textureBitmapPath, FileMode.Open, FileAccess.Read);
-            byte[] bitmapData = new byte[stream.Length];
-            
-            stream.Read(bitmapData);
-            bitmapData = ConvertToLinearTexture(bitmapData, (int)xboxHeader.Format.Size.Width, (int)xboxHeader.Format.Size.Height, xboxHeader.Format.DataFormat);
-            stream.Close();
-            
-            stream = new FileStream(outPath, FileMode.OpenOrCreate, FileAccess.Write);
-            stream.Write(bitmapData);
-            stream.Close();
+            return;
         }
+
+        byte[] bitmapData = File.ReadAllBytes(textureBitmapPath);
+        bitmapData = GetUntiled360TextureData(xboxHeader, bitmapData);
+        File.WriteAllBytes(outPath, bitmapData);
+    }
+
+    public static byte[] GetUntiled360TextureData(TextureX360 xboxHeader, byte[] bitmapData)
+    {
+        return xboxHeader.Format.Tiled
+            ? ConvertToLinearTexture(bitmapData, xboxHeader.Width, xboxHeader.Height, xboxHeader.Format.DataFormat)
+            : bitmapData;
     }
 
     // THE BELOW CODE IS CREDITED TO NCDyson for RareView

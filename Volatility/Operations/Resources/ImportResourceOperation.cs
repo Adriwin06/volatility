@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 using Volatility.Resources;
+using Volatility.Utilities;
 
 namespace Volatility.Operations.Resources;
 
@@ -40,22 +41,9 @@ internal partial class ImportResourceOperation
 
         if (resourceType == ResourceType.Texture)
         {
-            string texturePath = Path.Combine
-            (
-                Path.GetDirectoryName(sourceFile) ?? string.Empty,
-                Path.GetFileNameWithoutExtension(sourceFile) +
-                resource.Unpacker switch
-                {
-                    Unpacker.Bnd2Manager => "_2.bin",
-                    Unpacker.DGI => "_texture.dat",
-                    Unpacker.YAP => "_secondary.dat",
-                    Unpacker.Raw => "_texture.dat",
-                    Unpacker.Volatility => throw new NotImplementedException(),
-                    _ => throw new NotImplementedException(),
-                }
-            );
+            string texturePath = TextureBitmapUtilities.GetSecondaryBitmapPath(sourceFile, resource.Unpacker);
 
-            if (File.Exists(texturePath))
+            if (resource is TextureBase texture && File.Exists(texturePath))
             {
                 string outPath = Path.Combine
                 (
@@ -63,7 +51,7 @@ internal partial class ImportResourceOperation
                     Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(Path.GetFullPath(filePath)))
                 );
 
-                File.Copy(texturePath, $"{outPath}.{resourceType}Bitmap", overwrite);
+                TextureBitmapUtilities.WriteNormalizedBitmapFile(texture, texturePath, $"{outPath}.{resourceType}Bitmap", overwrite);
             }
         }
 

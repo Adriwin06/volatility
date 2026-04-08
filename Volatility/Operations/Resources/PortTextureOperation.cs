@@ -172,34 +172,14 @@ internal class PortTextureOperation
                     outPath = resolvedDestinationPath + Path.DirectorySeparatorChar + outResourceFilename;
                 }
 
-                string secondaryExtension = sourceTexture.Unpacker switch
-                {
-                    Unpacker.Bnd2Manager => "_2.bin",
-                    Unpacker.DGI => "_texture.dat",
-                    Unpacker.YAP => "_secondary.dat",
-                    Unpacker.Raw => "_texture.dat",
-                    Unpacker.Volatility => throw new NotImplementedException(),
-                    _ => throw new NotImplementedException(),
-                };
-
-                string primaryExtension = sourceTexture.Unpacker switch
-                {
-                    Unpacker.Bnd2Manager => "_1.bin",
-                    Unpacker.DGI => ".dat",
-                    Unpacker.YAP => "_primary.dat",
-                    Unpacker.Raw => ".dat",
-                    Unpacker.Volatility => throw new NotImplementedException(),
-                    _ => throw new NotImplementedException(),
-                };
-
-                string sourceBitmapPath = $"{Path.GetDirectoryName(sourceFile)}{Path.DirectorySeparatorChar}{Path.GetFileName(sourceFile).Split(primaryExtension)[0]}{secondaryExtension}";
+                string sourceBitmapPath = TextureBitmapUtilities.GetSecondaryBitmapPath(sourceFile, sourceTexture.Unpacker);
 
                 if (!Path.Exists(sourceBitmapPath))
                 {
                     Console.WriteLine($"Failed to find associated bitmap data for {Path.GetFileNameWithoutExtension(sourceFile)} at path {sourceBitmapPath}!");
                 }
 
-                string destinationBitmapPath = $"{Path.GetDirectoryName(outPath)}{Path.DirectorySeparatorChar}{Path.GetFileName(sourceFile).Split(primaryExtension)[0]}{secondaryExtension}";
+                string destinationBitmapPath = TextureBitmapUtilities.GetSecondaryBitmapPath(outPath, sourceTexture.Unpacker);
 
                 if (Path.Exists(destinationBitmapPath))
                 {
@@ -213,54 +193,21 @@ internal class PortTextureOperation
                         PS3TextureUtilities.PS3GTFToDDS(sourcePath, sourceBitmapPath, destinationBitmapPath, verbose);
                     }
 
+                    byte[] sourceBitmapData = TextureBitmapUtilities.ReadNormalizedBitmapData(sourceTexture, sourceBitmapPath);
+
                     if (destinationTexture is TextureX360 destX && sourceTexture.ResourcePlatform != Platform.X360)
                     {
                         destX.Format.MaxMipLevel = destX.Format.MinMipLevel;
                     }
-                    if (sourceTexture is TextureX360 sourceX)
+
+                    if (!TryConvertTexture(sourceTexture, destinationTexture, sourceBitmapData, destinationBitmapPath))
                     {
-                        string conversionBitmapPath = sourceBitmapPath;
-                        string? temporaryBitmapPath = null;
-
-                        if (sourceX.Format.Tiled && !string.IsNullOrEmpty(sourceBitmapPath))
-                        {
-                            if (verbose) Console.WriteLine($"Detiling X360 bitmap data for {Path.GetDirectoryName(outPath)}{Path.DirectorySeparatorChar}{Path.GetFileNameWithoutExtension(outPath)}_texture.dat...");
-                            temporaryBitmapPath = Path.GetTempFileName();
-                            X360TextureUtilities.WriteUntiled360TextureFile(sourceX, sourceBitmapPath, temporaryBitmapPath);
-                            conversionBitmapPath = temporaryBitmapPath;
-                        }
-
-                        try
-                        {
-                            if (!TryConvertTexture(sourceTexture, destinationTexture, conversionBitmapPath, destinationBitmapPath))
-                            {
-                                if (verbose) Console.WriteLine($"Copying associated bitmap data for {Path.GetDirectoryName(outPath)}{Path.DirectorySeparatorChar}{Path.GetFileNameWithoutExtension(outPath)}_texture.dat...");
-                                File.Copy(conversionBitmapPath, destinationBitmapPath, true);
-                            }
-                            else
-                            {
-                                if (verbose) Console.WriteLine($"Converting associated bitmap data for {Path.GetDirectoryName(outPath)}{Path.DirectorySeparatorChar}{Path.GetFileNameWithoutExtension(outPath)}_texture.dat...");
-                            }
-                        }
-                        finally
-                        {
-                            if (!string.IsNullOrEmpty(temporaryBitmapPath) && File.Exists(temporaryBitmapPath))
-                            {
-                                File.Delete(temporaryBitmapPath);
-                            }
-                        }
+                        if (verbose) Console.WriteLine($"Writing associated bitmap data for {Path.GetDirectoryName(outPath)}{Path.DirectorySeparatorChar}{Path.GetFileNameWithoutExtension(outPath)}_texture.dat...");
+                        File.WriteAllBytes(destinationBitmapPath, sourceBitmapData);
                     }
                     else
                     {
-                        if (!TryConvertTexture(sourceTexture, destinationTexture, sourceBitmapPath, destinationBitmapPath))
-                        {
-                            if (verbose) Console.WriteLine($"Copying associated bitmap data for {Path.GetDirectoryName(outPath)}{Path.DirectorySeparatorChar}{Path.GetFileNameWithoutExtension(outPath)}_texture.dat...");
-                            File.Copy(sourceBitmapPath, destinationBitmapPath, true);
-                        }
-                        else
-                        {
-                            if (verbose) Console.WriteLine($"Converting associated bitmap data for {Path.GetDirectoryName(outPath)}{Path.DirectorySeparatorChar}{Path.GetFileNameWithoutExtension(outPath)}_texture.dat...");
-                        }
+                        if (verbose) Console.WriteLine($"Converting associated bitmap data for {Path.GetDirectoryName(outPath)}{Path.DirectorySeparatorChar}{Path.GetFileNameWithoutExtension(outPath)}_texture.dat...");
                     }
                     if (verbose) Console.WriteLine($"Wrote texture bitmap data to {destinationFormat} destination directory.");
 
@@ -347,16 +294,13 @@ internal class PortTextureOperation
         }
     }
 
-    private bool TryConvertTexture(TextureBase srcTexture, TextureBase destTexture, string inPath, string outPath)
+    private bool TryConvertTexture(TextureBase srcTexture, TextureBase destTexture, byte[] bitmap, string outPath)
     {
-        byte[] bitmap = File.ReadAllBytes(inPath);
         switch (srcTexture, destTexture)
         {
             case (TexturePS3 ps3, TextureBPR bpr):
                 if (ps3.Format == CELL_GCM_COLOR_FORMAT.CELL_GCM_TEXTURE_A8R8G8B8)
                 {
-                    bitmap = PS3TextureUtilities.DecodePS3A8R8G8B8(bitmap, ps3.Width, ps3.Height, ps3.MipmapLevels);
-
                     if (bpr.Format == DXGI_FORMAT.DXGI_FORMAT_R8G8B8A8_UNORM)
                     {
                         DDSTextureUtilities.A8R8G8B8toR8G8B8A8(bitmap, ps3.Width, ps3.Height, ps3.MipmapLevels);
@@ -374,8 +318,6 @@ internal class PortTextureOperation
             case (TexturePS3 ps3, TexturePC tub):
                 if (ps3.Format == CELL_GCM_COLOR_FORMAT.CELL_GCM_TEXTURE_A8R8G8B8)
                 {
-                    bitmap = PS3TextureUtilities.DecodePS3A8R8G8B8(bitmap, ps3.Width, ps3.Height, ps3.MipmapLevels);
-
                     if (tub.Format == D3DFORMAT.D3DFMT_A8R8G8B8)
                     {
                         break;
@@ -393,7 +335,6 @@ internal class PortTextureOperation
                 if (ps3.Format == CELL_GCM_COLOR_FORMAT.CELL_GCM_TEXTURE_A8R8G8B8
                 && x360.Format.DataFormat == GPUTEXTUREFORMAT.GPUTEXTUREFORMAT_8_8_8_8)
                 {
-                    bitmap = PS3TextureUtilities.DecodePS3A8R8G8B8(bitmap, ps3.Width, ps3.Height, ps3.MipmapLevels);
                     break;
                 }
                 bitmap = Array.Empty<byte>();
