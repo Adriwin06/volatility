@@ -1,0 +1,4 @@
+[submodule "tools/libbndl-extractor"]
+	path = tools/libbndl-extractor
+	url = ../volatility-libbndl-extractor
+	branch = main

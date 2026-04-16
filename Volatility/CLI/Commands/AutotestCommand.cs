@@ -1,5 +1,6 @@
 using System.Reflection;
 
+using Volatility.Operations.Autotest;
 using Volatility.Resources;
 
 using static Volatility.Utilities.TypeUtilities;
@@ -11,14 +12,41 @@ internal class AutotestCommand : ICommand
 {
     public static string CommandToken => "autotest";
     public static string CommandDescription => "Runs automatic tests to ensure the application is working." +
-        " When provided a path & format, will import, export, then reimport specified file to ensure IO parity.";
-    public static string CommandParameters => "[--format=<tub,bpr,x360,ps3>] [--path=<file path>]";
+        " When provided a path & format, will import, export, then reimport specified file to ensure IO parity." +
+        " When provided one or more game paths, will probe all bundle-like root files through libbndl and run automated resource operations on supported resource types.";
+    public static string CommandParameters => "[--format=<tub,bpr,x360,ps3>] [--path=<file path>] [--game=<dir>] [--games=<dir1|dir2>] [--bundletool=<file>] [--workdir=<dir>] [--bundlelimit=<n,0=all>] [--resourcelimit=<n>] [--keepartifacts]";
 
     public string? Format { get; set; }
     public string? Path { get; set; }
+    public string? GamePath { get; set; }
+    public string? GamePaths { get; set; }
+    public string? BundleToolPath { get; set; }
+    public string? WorkingDirectory { get; set; }
+    public int BundleLimit { get; set; }
+    public int ResourceLimit { get; set; } = 2;
+    public bool KeepArtifacts { get; set; }
 
     public async Task Execute()
     {
+        IReadOnlyList<string> gamePaths = ParseGamePaths();
+        if (gamePaths.Count > 0)
+        {
+            GameAutotestOperation operation = new();
+            GameAutotestSummary summary = await operation.ExecuteAsync(new GameAutotestOptions
+            {
+                GamePaths = gamePaths,
+                BundleToolPath = BundleToolPath,
+                WorkingDirectory = WorkingDirectory,
+                BundleLimitPerGame = BundleLimit,
+                ResourcesPerType = ResourceLimit,
+                KeepArtifacts = KeepArtifacts
+            });
+
+            Console.WriteLine(
+                $"AUTOTEST - Completed. Passed={summary.Passed}, Failed={summary.Failed}, Skipped={summary.Skipped}");
+            return;
+        }
+
         if (!string.IsNullOrEmpty(Path))
         {
             TextureBase? header = Format switch
@@ -127,6 +155,23 @@ internal class AutotestCommand : ICommand
     {
         Format = (args.TryGetValue("format", out object? format) ? format as string : "auto").ToUpper();
         Path = args.TryGetValue("path", out object? path) ? path as string : "";
+        GamePath = args.TryGetValue("game", out object? game) ? game as string : "";
+        GamePaths = args.TryGetValue("games", out object? games) ? games as string : "";
+        BundleToolPath = args.TryGetValue("bundletool", out object? bundleTool) ? bundleTool as string : "";
+        WorkingDirectory = args.TryGetValue("workdir", out object? workdir) ? workdir as string : "";
+        KeepArtifacts = args.TryGetValue("keepartifacts", out var keepArtifacts) && (bool)keepArtifacts;
+
+        if (args.TryGetValue("bundlelimit", out object? bundleLimitValue) &&
+            int.TryParse(bundleLimitValue?.ToString(), out int bundleLimit))
+        {
+            BundleLimit = Math.Max(0, bundleLimit);
+        }
+
+        if (args.TryGetValue("resourcelimit", out object? resourceLimitValue) &&
+            int.TryParse(resourceLimitValue?.ToString(), out int resourceLimit))
+        {
+            ResourceLimit = Math.Max(1, resourceLimit);
+        }
     }
 
     public void TestHeaderRW(string name, TextureBase header, bool skipImport = false) 
@@ -232,6 +277,28 @@ internal class AutotestCommand : ICommand
 
         Console.WriteLine(">> Finished Comparing properties and fields of " + type.Name + $" - {mismatches} mismatches");
         Console.ResetColor();
+    }
+
+    private IReadOnlyList<string> ParseGamePaths()
+    {
+        List<string> paths = [];
+
+        if (!string.IsNullOrWhiteSpace(GamePath))
+        {
+            paths.Add(GamePath);
+        }
+
+        if (!string.IsNullOrWhiteSpace(GamePaths))
+        {
+            paths.AddRange(
+                GamePaths
+                    .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        }
+
+        return paths
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     public AutotestCommand() { }

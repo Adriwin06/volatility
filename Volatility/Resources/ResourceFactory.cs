@@ -81,6 +81,12 @@ public static class ResourceFactory
         { (ResourceType.AptData, Platform.X360), path => new AptData(path, Endian.BE) },
         { (ResourceType.AptData, Platform.PS3), path => new AptData(path, Endian.BE) },
 
+        // GuiPopup resources
+        { (ResourceType.GuiPopup, Platform.BPR), path => new GuiPopup(path, Endian.LE) },
+        { (ResourceType.GuiPopup, Platform.TUB), path => new GuiPopup(path, Endian.LE) },
+        { (ResourceType.GuiPopup, Platform.X360), path => new GuiPopup(path, Endian.BE) },
+        { (ResourceType.GuiPopup, Platform.PS3), path => new GuiPopup(path, Endian.BE) },
+
         // Shader resources
         { (ResourceType.Shader, Platform.Agnostic), path => new ShaderBase(path) },
         { (ResourceType.Shader, Platform.TUB), path => new ShaderPC(path) },
