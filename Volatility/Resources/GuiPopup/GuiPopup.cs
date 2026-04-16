@@ -1,109 +1,50 @@
-﻿using System.Text;
+using Volatility.Utilities;
 
 namespace Volatility.Resources;
 
 public class GuiPopup : Resource
 {
-    public List<Popup> Popups { get; } = new();
+    private const int HeaderSize = 0x8;
+    private const int PopupStructSize = 0xC0;
 
-    const int PopupStructSize = 0xC0;
+    public List<Popup> Popups { get; } = [];
 
     public override ResourceType ResourceType => ResourceType.GuiPopup;
     public override Platform ResourcePlatform => Platform.Agnostic;
 
     public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness)
     {
-        ushort size = (ushort)(Popups.Count * PopupStructSize);
         base.WriteToStream(writer, endianness);
+
         long start = writer.BaseStream.Position;
-        writer.Write((uint)0x8);
+        writer.Write((uint)HeaderSize);
         writer.Write((short)Popups.Count);
         writer.Write((short)PopupStructSize);
-        foreach (var p in Popups)
-            WriteOne(writer, p);
+        writer.WriteSection(start + HeaderSize, Popups, Popup.Write);
     }
 
     public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness)
     {
         base.ParseFromStream(reader, endianness);
+
         Popups.Clear();
+
         long start = reader.BaseStream.Position;
         uint dataPtr = reader.ReadUInt32();
         short count = reader.ReadInt16();
         short elemSize = reader.ReadInt16();
-        long ret = reader.BaseStream.Position;
-        reader.BaseStream.Position = start + dataPtr;
-        for (int i = 0; i < count; i++)
-            Popups.Add(ReadOne(reader));
-        reader.BaseStream.Position = ret;
-    }
 
-    static Popup ReadOne(ResourceBinaryReader r)
-    {
-        Popup p = new Popup();
-        p.NameId = r.ReadUInt64();
-        p.Name = ReadFixedString(r, 13);
-        r.BaseStream.Position += 3;
-        p.Style = (PopupStyle)r.ReadInt32();
-        p.Icon = (PopupIcons)r.ReadInt32();
-        p.TitleId = ReadFixedString(r, 32);
-        p.MessageId = ReadFixedString(r, 32);
-        p.MessageParam0 = (PopupParamTypes)r.ReadInt32();
-        p.MessageParam1 = (PopupParamTypes)r.ReadInt32();
-        p.MessageParamsUsed = r.ReadInt32();
-        p.Button1Id = ReadFixedString(r, 32);
-        p.Button1Param = (PopupParamTypes)r.ReadInt32();
-        p.Button1ParamUsed = r.ReadByte() != 0;
-        p.Button2Id = ReadFixedString(r, 32);
-        r.BaseStream.Position += 3;
-        p.Button2Param = (PopupParamTypes)r.ReadInt32();
-        p.Button2ParamUsed = r.ReadByte() != 0;
-        r.BaseStream.Position += 7;
-        return p;
-    }
-
-    static void WriteOne(ResourceBinaryWriter w, Popup p)
-    {
-        w.Write(p.NameId);
-        WriteFixedString(w, p.Name, 13);
-        w.Write(new byte[3]);
-        w.Write((int)p.Style);
-        w.Write((int)p.Icon);
-        WriteFixedString(w, p.TitleId, 32);
-        WriteFixedString(w, p.MessageId, 32);
-        w.Write((int)p.MessageParam0);
-        w.Write((int)p.MessageParam1);
-        w.Write(p.MessageParamsUsed);
-        WriteFixedString(w, p.Button1Id, 32);
-        w.Write((int)p.Button1Param);
-        w.Write((byte)(p.Button1ParamUsed ? 1 : 0));
-        WriteFixedString(w, p.Button2Id, 32);
-        w.Write(new byte[3]);
-        w.Write((int)p.Button2Param);
-        w.Write((byte)(p.Button2ParamUsed ? 1 : 0));
-        w.Write(new byte[7]);
-    }
-
-    static string ReadFixedString(ResourceBinaryReader r, int len)
-    {
-        var bytes = r.ReadBytes(len);
-        int n = Array.IndexOf<byte>(bytes, 0);
-        if (n >= 0) return Encoding.ASCII.GetString(bytes, 0, n);
-        return Encoding.ASCII.GetString(bytes);
-    }
-
-    static void WriteFixedString(ResourceBinaryWriter w, string? s, int len)
-    {
-        var bytes = Encoding.ASCII.GetBytes(s ?? string.Empty);
-        if (bytes.Length > len) w.Write(bytes, 0, len);
-        else
+        if (elemSize != PopupStructSize)
         {
-            w.Write(bytes);
-            if (bytes.Length < len) w.Write(new byte[len - bytes.Length]);
+            throw new InvalidDataException(
+                $"GuiPopup element size mismatch! Expected 0x{PopupStructSize:X}, found 0x{elemSize:X}.");
         }
+
+        reader.ParseSection(start + dataPtr, count, Popup.Read, Popups);
     }
 
     public GuiPopup() : base() { }
+
     public GuiPopup(string path, Endian endianness) : base(path, endianness) { }
 
     public enum PopupStyle : int
@@ -159,5 +100,59 @@ public class GuiPopup : Resource
         public string Button2Id;
         public PopupParamTypes Button2Param;
         public bool Button2ParamUsed;
+
+        public static Popup Read(ResourceBinaryReader reader)
+        {
+            Popup popup = new()
+            {
+                NameId = reader.ReadUInt64(),
+                Name = ResourceUtilities.ReadFixedString(reader, 13)
+            };
+
+            reader.BaseStream.Seek(0x3, SeekOrigin.Current);
+
+            popup.Style = (PopupStyle)reader.ReadInt32();
+            popup.Icon = (PopupIcons)reader.ReadInt32();
+            popup.TitleId = ResourceUtilities.ReadFixedString(reader, 32);
+            popup.MessageId = ResourceUtilities.ReadFixedString(reader, 32);
+            popup.MessageParam0 = (PopupParamTypes)reader.ReadInt32();
+            popup.MessageParam1 = (PopupParamTypes)reader.ReadInt32();
+            popup.MessageParamsUsed = reader.ReadInt32();
+            popup.Button1Id = ResourceUtilities.ReadFixedString(reader, 32);
+            popup.Button1Param = (PopupParamTypes)reader.ReadInt32();
+            popup.Button1ParamUsed = reader.ReadByte() != 0;
+            popup.Button2Id = ResourceUtilities.ReadFixedString(reader, 32);
+
+            reader.BaseStream.Seek(0x3, SeekOrigin.Current);
+
+            popup.Button2Param = (PopupParamTypes)reader.ReadInt32();
+            popup.Button2ParamUsed = reader.ReadByte() != 0;
+
+            reader.BaseStream.Seek(0x7, SeekOrigin.Current);
+
+            return popup;
+        }
+
+        public static void Write(ResourceBinaryWriter writer, Popup popup)
+        {
+            writer.Write(popup.NameId);
+            ResourceUtilities.WriteFixedString(writer, popup.Name, 13);
+            writer.Write(new byte[0x3]);
+            writer.Write((int)popup.Style);
+            writer.Write((int)popup.Icon);
+            ResourceUtilities.WriteFixedString(writer, popup.TitleId, 32);
+            ResourceUtilities.WriteFixedString(writer, popup.MessageId, 32);
+            writer.Write((int)popup.MessageParam0);
+            writer.Write((int)popup.MessageParam1);
+            writer.Write(popup.MessageParamsUsed);
+            ResourceUtilities.WriteFixedString(writer, popup.Button1Id, 32);
+            writer.Write((int)popup.Button1Param);
+            writer.Write((byte)(popup.Button1ParamUsed ? 1 : 0));
+            ResourceUtilities.WriteFixedString(writer, popup.Button2Id, 32);
+            writer.Write(new byte[0x3]);
+            writer.Write((int)popup.Button2Param);
+            writer.Write((byte)(popup.Button2ParamUsed ? 1 : 0));
+            writer.Write(new byte[0x7]);
+        }
     }
 }

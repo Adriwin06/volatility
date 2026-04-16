@@ -17,10 +17,13 @@ public class BinaryResource : Resource
     public BinaryResource(uint dataOffset, uint dataSize)
     {
         DataSize = dataSize;
-        DataOffset = dataOffset;
+        DataOffset = dataOffset == 0 ? 0x10u : dataOffset;
     }
 
-    public BinaryResource() : base() { }
+    public BinaryResource() : base()
+    {
+        DataOffset = 0x10;
+    }
     
     public BinaryResource(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 
@@ -36,8 +39,16 @@ public class BinaryResource : Resource
     
     public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness = Endian.Agnostic)
     {
+        base.WriteToStream(writer, endianness);
+
+        if (DataOffset < 0x10)
+        {
+            DataOffset = 0x10;
+        }
+
         writer.Write(DataSize);
         writer.Write(DataOffset);
         writer.Write(new byte[8]);
+        writer.BaseStream.Seek(DataOffset, SeekOrigin.Begin);
     }
 }

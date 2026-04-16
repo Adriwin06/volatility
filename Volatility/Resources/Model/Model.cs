@@ -1,14 +1,22 @@
-﻿namespace Volatility.Resources;
+using Volatility.Utilities;
+
+namespace Volatility.Resources;
 
 // The Model resource type links top-level resources (like InstanceList)
 // to Renderable resources that contain the 3D geometry, while including
 // Level of Detail (LOD) information.
-
+//
 // Learn More:
 // https://burnout.wiki/wiki/Model
 
 public class Model : Resource
 {
+    private const int HeaderSize = 0x14;
+    private const int RenderableOffsetSize = sizeof(uint);
+    private const int StateSize = sizeof(byte);
+    private const int LodDistanceSize = sizeof(float);
+    private const int ImportEntrySize = 0x10;
+
     [EditorCategory("Model Container"), EditorLabel("Flags")]
     public byte Flags;
 
@@ -22,73 +30,64 @@ public class Model : Resource
     {
         base.WriteToStream(writer, endianness);
 
-        int models = ModelDatas.Count;
+        int modelCount = ModelDatas.Count;
+        if (modelCount > byte.MaxValue)
+        {
+            throw new InvalidDataException("Model resources cannot store more than 255 renderables.");
+        }
 
-        uint renderablesPtr = 0x14; // Writing length of header
-        uint statesPtr = (uint)(renderablesPtr + (0x4 * models));
-        uint lodDistancesPtr = (uint)(statesPtr + (0x1 * models));
+        long currentOffset = HeaderSize;
+        long renderablesOffset = ResourceUtilities.GetSectionOffset(
+            ref currentOffset,
+            modelCount * RenderableOffsetSize,
+            1);
+        long statesOffset = ResourceUtilities.GetSectionOffset(
+            ref currentOffset,
+            modelCount * StateSize,
+            1);
+        long lodDistancesOffset = ResourceUtilities.GetSectionOffset(
+            ref currentOffset,
+            modelCount * LodDistanceSize,
+            1);
+        long importsOffset = ResourceUtilities.GetSectionOffset(
+            ref currentOffset,
+            modelCount * ImportEntrySize,
+            1);
 
-        writer.Write(renderablesPtr);
-        writer.Write(statesPtr);
-        writer.Write(lodDistancesPtr);
-        writer.Write(-1); // Game explorer index, leaving our mark for now
-        writer.Write((byte)ModelDatas.Count); // Dangerous. We need to limit number of models
+        writer.Write((uint)renderablesOffset);
+        writer.Write((uint)statesOffset);
+        writer.Write((uint)lodDistancesOffset);
+        writer.Write(-1);
+        writer.Write((byte)modelCount);
         writer.Write(Flags);
-        writer.Write((byte)ModelDatas.Count); // Number of states. Same as number of renderables
-        writer.BaseStream.WriteByte(0x02);
+        writer.Write((byte)modelCount);
+        writer.Write((byte)0x02);
 
-        writer.BaseStream.Seek(renderablesPtr, SeekOrigin.Begin);
-
-        // Renderable Ptrs
-        for (int i = 0; i < models; i++)
-        {
-            writer.Write((uint)(i * 0x4));
-        }
-
-        // States (Writing as uint?? A single renderable has a 0x4-long state apparently.)
-        for (int i = 0; i < models; i++)
-        {
-            writer.Write((uint)ModelDatas[i].State);
-        }
-
-        // LOD Distances
-        for (int i = 0; i < models; i++)
-        {
-            writer.Write(ModelDatas[i].LODDistance);
-        }
-
-        // Resource ID References
-        for (int i = 0; i < models; i++)
-        {
-            writer.Write(ModelDatas[i].ResourceReference.ReferenceID);
-            writer.Write(renderablesPtr + (i * 0x4));
-            writer.Write((uint)0x0); // Unknown. Always 0 in BPR, not always 0 on X360
-        }
+        writer.WriteSection<ModelData>(renderablesOffset, ModelDatas, static (w, _, index) => w.Write((uint)(index * ImportEntrySize)));
+        writer.WriteSection(statesOffset, ModelDatas, (w, modelData) => w.Write((byte)modelData.State));
+        writer.WriteSection(lodDistancesOffset, ModelDatas, (w, modelData) => w.Write(modelData.LODDistance));
+        writer.WriteSection<ModelData>(importsOffset, ModelDatas, WriteImportEntry);
     }
+
     public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness = Endian.Agnostic)
     {
         base.ParseFromStream(reader, endianness);
 
-        // Get the version check out of the way before we begin.
         reader.BaseStream.Seek(0x13, SeekOrigin.Begin);
         if (reader.ReadByte() != 0x2)
         {
-            throw new Exception("Version mismatch!");
+            throw new InvalidDataException("Version mismatch!");
         }
 
         reader.BaseStream.Seek(0x0, SeekOrigin.Begin);
 
-        // Absolute pointers (not relative to any specific point in the file)
         uint renderablesPtr = reader.ReadUInt32();
         uint renderableStatesPtr = reader.ReadUInt32();
         uint lodDistancesPtr = reader.ReadUInt32();
 
-        // Null for imported resources.
-        // TODO: Reconstruct game explorer or get from ResourceDB
-        int gameExplorerIndex = reader.ReadInt32();
+        _ = reader.ReadInt32();
 
         byte numRenderables = reader.ReadByte();
-
         if (numRenderables == 0)
         {
             Console.WriteLine("WARNING: Found no renderables in this model!");
@@ -96,45 +95,63 @@ public class Model : Resource
 
         Flags = reader.ReadByte();
 
-        long maxLength = new[]
-        {
-            lodDistancesPtr + numRenderables * sizeof(uint),
-            renderablesPtr + numRenderables * sizeof(uint),
-            renderableStatesPtr + numRenderables
-        }.Max();
+        long importsOffset = Math.Max(
+            lodDistancesPtr + (numRenderables * LodDistanceSize),
+            Math.Max(
+                renderablesPtr + (numRenderables * RenderableOffsetSize),
+                renderableStatesPtr + (numRenderables * StateSize)));
 
-        // This currently does a lot of seeking.
-        // It may improve performance if we separate this.
+        ModelDatas.Clear();
         for (int i = 0; i < numRenderables; i++)
         {
-            ModelData modelData = new ModelData();
-            
-            reader.BaseStream.Seek(renderablesPtr + (i * 0x4), SeekOrigin.Begin);
-
-            uint idRelativePtr = reader.ReadUInt32();
-
-            reader.BaseStream.Seek(renderableStatesPtr + i, SeekOrigin.Begin);
-            modelData.State = (State)reader.ReadByte();
-
-            reader.BaseStream.Seek(lodDistancesPtr + (i * 0x4), SeekOrigin.Begin);
-            modelData.LODDistance = reader.ReadSingle();
-
-            reader.BaseStream.Seek(
-                idRelativePtr + 
-                renderablesPtr + 
-                (numRenderables * (0x4 + 0x1 + 0x4)) + 
-                (reader.Endianness == Endian.BE ? 0x4 : 0x0), SeekOrigin.Begin
-            );
-
-            ResourceImport.ReadExternalImport(i, reader, maxLength, out modelData.ResourceReference);
-
-            ModelDatas.Add(modelData);
+            ModelDatas.Add(ReadModelData(
+                reader,
+                i,
+                numRenderables,
+                renderablesPtr,
+                renderableStatesPtr,
+                lodDistancesPtr,
+                importsOffset));
         }
     }
 
     public Model() : base() { }
 
     public Model(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
+
+    private static ModelData ReadModelData(
+        ResourceBinaryReader reader,
+        int index,
+        byte numRenderables,
+        uint renderablesPtr,
+        uint renderableStatesPtr,
+        uint lodDistancesPtr,
+        long importsOffset)
+    {
+        ModelData modelData = new();
+
+        reader.ParseSection(renderablesPtr + (index * RenderableOffsetSize), r => r.ReadUInt32(), out uint importRelativeOffset);
+        reader.ParseSection(renderableStatesPtr + index, r => (State)r.ReadByte(), out modelData.State);
+        reader.ParseSection(lodDistancesPtr + (index * LodDistanceSize), r => r.ReadSingle(), out modelData.LODDistance);
+
+        reader.BaseStream.Seek(
+            importRelativeOffset +
+            renderablesPtr +
+            (numRenderables * (RenderableOffsetSize + StateSize + LodDistanceSize)) +
+            (reader.Endianness == Endian.BE ? 0x4 : 0x0),
+            SeekOrigin.Begin);
+
+        ResourceImport.ReadExternalImport(index, reader, importsOffset, out modelData.ResourceReference);
+        return modelData;
+    }
+
+    private static void WriteImportEntry(ResourceBinaryWriter writer, ModelData modelData, int index)
+    {
+        _ = index;
+        writer.Write(ResourceUtilities.ResolveResourceID(modelData.ResourceReference));
+        writer.Write(0u);
+        writer.Write(0u);
+    }
 
     public struct ModelData
     {
