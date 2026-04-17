@@ -9,7 +9,7 @@ namespace Volatility.Resources;
 // Learn More:
 // https://burnout.wiki/wiki/Model
 
-public class Model : Resource
+public class Model : TypedResource
 {
     private const int HeaderSize = 0x14;
     private const int RenderableOffsetSize = sizeof(uint);
@@ -17,14 +17,14 @@ public class Model : Resource
     private const int LodDistanceSize = sizeof(float);
     private const int ImportEntrySize = 0x10;
 
+    [EditorHidden]
+    public uint HeaderMetadata;
+
     [EditorCategory("Model Container"), EditorLabel("Flags")]
     public byte Flags;
 
     [EditorCategory("Model Container"), EditorLabel("Models")]
     public List<ModelData> ModelDatas = [];
-
-    public override ResourceType ResourceType => ResourceType.Model;
-    public override Platform ResourcePlatform => Platform.Agnostic;
 
     public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness = Endian.Agnostic)
     {
@@ -48,16 +48,11 @@ public class Model : Resource
         long lodDistancesOffset = ResourceUtilities.GetSectionOffset(
             ref currentOffset,
             modelCount * LodDistanceSize,
-            1);
-        long importsOffset = ResourceUtilities.GetSectionOffset(
-            ref currentOffset,
-            modelCount * ImportEntrySize,
-            1);
-
+            sizeof(uint));
         writer.Write((uint)renderablesOffset);
         writer.Write((uint)statesOffset);
         writer.Write((uint)lodDistancesOffset);
-        writer.Write(-1);
+        writer.Write(HeaderMetadata);
         writer.Write((byte)modelCount);
         writer.Write(Flags);
         writer.Write((byte)modelCount);
@@ -66,7 +61,6 @@ public class Model : Resource
         writer.WriteSection<ModelData>(renderablesOffset, ModelDatas, static (w, _, index) => w.Write((uint)(index * ImportEntrySize)));
         writer.WriteSection(statesOffset, ModelDatas, (w, modelData) => w.Write((byte)modelData.State));
         writer.WriteSection(lodDistancesOffset, ModelDatas, (w, modelData) => w.Write(modelData.LODDistance));
-        writer.WriteSection<ModelData>(importsOffset, ModelDatas, WriteImportEntry);
     }
 
     public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness = Endian.Agnostic)
@@ -85,7 +79,7 @@ public class Model : Resource
         uint renderableStatesPtr = reader.ReadUInt32();
         uint lodDistancesPtr = reader.ReadUInt32();
 
-        _ = reader.ReadInt32();
+        HeaderMetadata = reader.ReadUInt32();
 
         byte numRenderables = reader.ReadByte();
         if (numRenderables == 0)
@@ -115,9 +109,10 @@ public class Model : Resource
         }
     }
 
-    public Model() : base() { }
+    public Model() : base(ResourceType.Model) { }
 
-    public Model(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
+    public Model(string path, Endian endianness = Endian.Agnostic)
+        : base(ResourceType.Model, path, endianness) { }
 
     private static ModelData ReadModelData(
         ResourceBinaryReader reader,
@@ -145,12 +140,20 @@ public class Model : Resource
         return modelData;
     }
 
-    private static void WriteImportEntry(ResourceBinaryWriter writer, ModelData modelData, int index)
+    public IEnumerable<KeyValuePair<long, ResourceImport>> GetExternalImports()
     {
-        _ = index;
-        writer.Write(ResourceUtilities.ResolveResourceID(modelData.ResourceReference));
-        writer.Write(0u);
-        writer.Write(0u);
+        for (int i = 0; i < ModelDatas.Count; i++)
+        {
+            ResourceImport resourceReference = ModelDatas[i].ResourceReference;
+            if (!resourceReference.ExternalImport)
+            {
+                continue;
+            }
+
+            yield return new KeyValuePair<long, ResourceImport>(
+                HeaderSize + (i * RenderableOffsetSize),
+                resourceReference);
+        }
     }
 
     public struct ModelData

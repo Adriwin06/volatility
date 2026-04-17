@@ -1,102 +1,38 @@
-
 namespace Volatility.Resources;
 
 public static class ResourceFactory
 {
-    private static readonly Dictionary<(ResourceType, Platform), Func<string, Resource>> resourceCreators = new()
+    private static readonly Dictionary<(ResourceType, Platform), Func<string, Resource>> resourceCreators = CreateResourceCreators();
+
+    private static Dictionary<(ResourceType, Platform), Func<string, Resource>> CreateResourceCreators()
     {
-        // Texture resources
-        { (ResourceType.Texture, Platform.BPR), path => {
-            var resource = new TextureBPR(path);
-            resource.PullAll();
-            return resource;
-        } },
-        { (ResourceType.Texture, Platform.TUB), path => {
-            var resource = new TexturePC(path);
-            resource.PullAll();
-            return resource;
-        } },
-        { (ResourceType.Texture, Platform.X360), path => {
-            var resource = new TextureX360(path);
-            resource.PullAll();
-            return resource;
-        } },
-        { (ResourceType.Texture, Platform.PS3), path => {
-            var resource = new TexturePS3(path);
-            resource.PullAll();
-            return resource;
-        } },
+        ResourceCreatorRegistry registry = new();
 
-        // Splicer resources
-        { (ResourceType.Splicer, Platform.BPR), path => new Splicer(path, Endian.LE) },
-        { (ResourceType.Splicer, Platform.TUB), path => new Splicer(path, Endian.LE) },
-        { (ResourceType.Splicer, Platform.X360), path => new Splicer(path, Endian.BE) },
-        { (ResourceType.Splicer, Platform.PS3), path => new Splicer(path, Endian.BE) },
+        registry.AddWithPullAll(ResourceType.Texture, Platform.BPR, static path => new TextureBPR(path));
+        registry.AddWithPullAll(ResourceType.Texture, Platform.TUB, static path => new TexturePC(path));
+        registry.AddWithPullAll(ResourceType.Texture, Platform.X360, static path => new TextureX360(path));
+        registry.AddWithPullAll(ResourceType.Texture, Platform.PS3, static path => new TexturePS3(path));
 
-        // Renderable resources
-        { (ResourceType.Renderable, Platform.BPR), path => new RenderableBPR(path) },
-        { (ResourceType.Renderable, Platform.TUB), path => new RenderablePC(path) },
-        { (ResourceType.Renderable, Platform.X360), path => new RenderableX360(path) },
-        { (ResourceType.Renderable, Platform.PS3), path => new RenderablePS3(path) },
+        registry.AddEndianMapped(ResourceType.Splicer, static (path, endian) => new Splicer(path, endian));
+        registry.Add(ResourceType.Renderable, Platform.BPR, static path => new RenderableBPR(path));
+        registry.Add(ResourceType.Renderable, Platform.TUB, static path => new RenderablePC(path));
+        registry.Add(ResourceType.Renderable, Platform.X360, static path => new RenderableX360(path));
+        registry.Add(ResourceType.Renderable, Platform.PS3, static path => new RenderablePS3(path));
+        registry.AddEndianMapped(ResourceType.InstanceList, static (path, endian) => new InstanceList(path, endian));
+        registry.AddEndianMapped(ResourceType.Model, static (path, endian) => new Model(path, endian));
+        registry.AddEndianMapped(ResourceType.EnvironmentKeyframe, static (path, endian) => new EnvironmentKeyframe(path, endian));
+        registry.AddEndianMapped(ResourceType.EnvironmentTimeLine, static (path, endian) => new EnvironmentTimeline(path, endian));
+        registry.AddEndianMapped(ResourceType.SnapshotData, static (path, endian) => new SnapshotData(path, endian));
+        registry.AddEndianMapped(ResourceType.AttribSysVault, static (path, endian) => new AttribSysVault(path, endian));
+        registry.AddEndianMapped(ResourceType.StreamedDeformationSpec, static (path, endian) => new StreamedDeformationSpec(path, endian));
+        registry.AddEndianMapped(ResourceType.AptData, static (path, endian) => new AptData(path, endian));
+        registry.AddEndianMapped(ResourceType.GuiPopup, static (path, endian) => new GuiPopup(path, endian));
 
-        // InstanceList resources
-        { (ResourceType.InstanceList, Platform.BPR), path => new InstanceList(path, Endian.LE) },
-        { (ResourceType.InstanceList, Platform.TUB), path => new InstanceList(path, Endian.LE) },
-        { (ResourceType.InstanceList, Platform.X360), path => new InstanceList(path, Endian.BE) },
-        { (ResourceType.InstanceList, Platform.PS3), path => new InstanceList(path, Endian.BE) },
+        registry.Add(ResourceType.Shader, Platform.Agnostic, static path => new ShaderBase(path));
+        registry.Add(ResourceType.Shader, Platform.TUB, static path => new ShaderPC(path));
 
-        // Model resources
-        { (ResourceType.Model, Platform.BPR), path => new Model(path, Endian.LE) },
-        { (ResourceType.Model, Platform.TUB), path => new Model(path, Endian.LE) },
-        { (ResourceType.Model, Platform.X360), path => new Model(path, Endian.BE) },
-        { (ResourceType.Model, Platform.PS3), path => new Model(path, Endian.BE) },
-
-        // EnvironmentKeyframe resources
-        { (ResourceType.EnvironmentKeyframe, Platform.BPR), path => new EnvironmentKeyframe(path, Endian.LE) },
-        { (ResourceType.EnvironmentKeyframe, Platform.TUB), path => new EnvironmentKeyframe(path, Endian.LE) },
-        { (ResourceType.EnvironmentKeyframe, Platform.X360), path => new EnvironmentKeyframe(path, Endian.BE) },
-        { (ResourceType.EnvironmentKeyframe, Platform.PS3), path => new EnvironmentKeyframe(path, Endian.BE) },
-
-        // EnvironmentTimeline resources
-        { (ResourceType.EnvironmentTimeLine, Platform.BPR), path => new EnvironmentTimeline(path, Endian.LE) },
-        { (ResourceType.EnvironmentTimeLine, Platform.TUB), path => new EnvironmentTimeline(path, Endian.LE) },
-        { (ResourceType.EnvironmentTimeLine, Platform.X360), path => new EnvironmentTimeline(path, Endian.BE) },
-        { (ResourceType.EnvironmentTimeLine, Platform.PS3), path => new EnvironmentTimeline(path, Endian.BE) },
-
-        // SnapshotData resources
-        { (ResourceType.SnapshotData, Platform.BPR), path => new SnapshotData(path, Endian.LE) },
-        { (ResourceType.SnapshotData, Platform.TUB), path => new SnapshotData(path, Endian.LE) },
-        { (ResourceType.SnapshotData, Platform.X360), path => new SnapshotData(path, Endian.BE) },
-        { (ResourceType.SnapshotData, Platform.PS3), path => new SnapshotData(path, Endian.BE) },
-
-        // AttribSysVault resources
-        { (ResourceType.AttribSysVault, Platform.BPR), path => new AttribSysVault(path, Endian.LE) },
-        { (ResourceType.AttribSysVault, Platform.TUB), path => new AttribSysVault(path, Endian.LE) },
-        { (ResourceType.AttribSysVault, Platform.X360), path => new AttribSysVault(path, Endian.BE) },
-        { (ResourceType.AttribSysVault, Platform.PS3), path => new AttribSysVault(path, Endian.BE) },
-        
-        // StreamedDeformationSpec resources
-        { (ResourceType.StreamedDeformationSpec, Platform.BPR), path => new StreamedDeformationSpec(path, Endian.LE) },
-        { (ResourceType.StreamedDeformationSpec, Platform.TUB), path => new StreamedDeformationSpec(path, Endian.LE) },
-        { (ResourceType.StreamedDeformationSpec, Platform.X360), path => new StreamedDeformationSpec(path, Endian.BE) },
-        { (ResourceType.StreamedDeformationSpec, Platform.PS3), path => new StreamedDeformationSpec(path, Endian.BE) },
-
-        // AptData resources
-        { (ResourceType.AptData, Platform.BPR), path => new AptData(path, Endian.LE) },
-        { (ResourceType.AptData, Platform.TUB), path => new AptData(path, Endian.LE) },
-        { (ResourceType.AptData, Platform.X360), path => new AptData(path, Endian.BE) },
-        { (ResourceType.AptData, Platform.PS3), path => new AptData(path, Endian.BE) },
-
-        // GuiPopup resources
-        { (ResourceType.GuiPopup, Platform.BPR), path => new GuiPopup(path, Endian.LE) },
-        { (ResourceType.GuiPopup, Platform.TUB), path => new GuiPopup(path, Endian.LE) },
-        { (ResourceType.GuiPopup, Platform.X360), path => new GuiPopup(path, Endian.BE) },
-        { (ResourceType.GuiPopup, Platform.PS3), path => new GuiPopup(path, Endian.BE) },
-
-        // Shader resources
-        { (ResourceType.Shader, Platform.Agnostic), path => new ShaderBase(path) },
-        { (ResourceType.Shader, Platform.TUB), path => new ShaderPC(path) },
-    };
+        return registry.Build();
+    }
 
     public static Resource CreateResource(ResourceType resourceType, Platform platform, string filePath, bool x64 = false)
     {
@@ -105,14 +41,62 @@ public static class ResourceFactory
         var key = (resourceType, platform);
         if (resourceCreators.TryGetValue(key, out var creator))
         {
-            var output = creator(filePath);
+            Resource output = creator(filePath);
             if (x64)
                 output.SetResourceArch(Arch.x64);
             return output;
         }
-        else
+
+        throw new InvalidPlatformException($"The '{resourceType}' type is not supported for the '{platform}' platform.");
+    }
+
+    private sealed class ResourceCreatorRegistry
+    {
+        private readonly Dictionary<(ResourceType, Platform), Func<string, Resource>> _creators = new();
+
+        public void AddCreator(ResourceType resourceType, Platform platform, Func<string, Resource> creator)
         {
-            throw new InvalidPlatformException($"The '{resourceType}' type is not supported for the '{platform}' platform.");
+            _creators.Add((resourceType, platform), creator);
+        }
+
+        public void Add<TResource>(
+            ResourceType resourceType,
+            Platform platform,
+            Func<string, TResource> creator,
+            Action<TResource>? afterCreate = null)
+            where TResource : Resource
+        {
+            AddCreator(resourceType, platform, path =>
+            {
+                TResource resource = creator(path);
+                afterCreate?.Invoke(resource);
+                return resource;
+            });
+        }
+
+        public void AddWithPullAll<TResource>(
+            ResourceType resourceType,
+            Platform platform,
+            Func<string, TResource> creator)
+            where TResource : Resource
+        {
+            Add(resourceType, platform, creator, static resource => resource.PullAll());
+        }
+
+        public void AddEndianMapped<TResource>(
+            ResourceType resourceType,
+            Func<string, Endian, TResource> creator)
+            where TResource : Resource
+        {
+            Add(resourceType, Platform.BPR, path => creator(path, Endian.LE));
+            Add(resourceType, Platform.TUB, path => creator(path, Endian.LE));
+            Add(resourceType, Platform.X360, path => creator(path, Endian.BE));
+            Add(resourceType, Platform.PS3, path => creator(path, Endian.BE));
+        }
+
+        public Dictionary<(ResourceType, Platform), Func<string, Resource>> Build()
+        {
+            return _creators;
         }
     }
 }

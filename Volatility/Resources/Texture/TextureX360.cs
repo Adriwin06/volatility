@@ -38,6 +38,7 @@ public class TextureX360 : TextureBase
     public uint MipFlush = 65535;
 
     public GPUTEXTURE_FETCH_CONSTANT Format = new GPUTEXTURE_FETCH_CONSTANT();
+    public byte[] FooterBytes = new byte[0xC];
 
     public TextureX360() : base() { }
 
@@ -120,15 +121,28 @@ public class TextureX360 : TextureBase
     // Not sure if this is accurate
     public override void PushInternalFormat()
     {
-        Format.Pitch = CalculatePitchX360(Width, Height);
+        if (Format.Pitch == 0)
+        {
+            Format.Pitch = CalculatePitchX360(Width, Height);
+        }
 
-        Format.MaxMipLevel = (byte)(MipmapLevels - 1);
+        if (Format.MaxMipLevel == 0 && MipmapLevels > 0)
+        {
+            Format.MaxMipLevel = (byte)(MipmapLevels - 1);
+        }
+
         Format.MinMipLevel = MostDetailedMip;
 
-        Format.PackedMips = Format.MaxMipLevel > 0;
+        if (!Format.PackedMips)
+        {
+            Format.PackedMips = Format.MaxMipLevel > 0;
+        }
 
-        // Not entirely correct but better than just using pitch
-        Format.MipAddress = CalculateMipAddressX360(Width, Height);
+        if (Format.MipAddress == 0 && Width > 0 && Height > 0)
+        {
+            // Not entirely correct but better than just using pitch
+            Format.MipAddress = CalculateMipAddressX360(Width, Height);
+        }
     }
 
     public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness = Endian.Agnostic)
@@ -154,9 +168,7 @@ public class TextureX360 : TextureBase
         writer.Write(MipFlush);
         writer.Write(Format.PackToBytes());
 
-        // Padding that's usually just garbage data.
-        writer.Write(Encoding.UTF8.GetBytes("Volatility"));
-        writer.Write(new byte[0x2]);
+        writer.WriteFixedBytes(FooterBytes, 0xC);
     }
 
     public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness = Endian.Agnostic)
@@ -185,6 +197,13 @@ public class TextureX360 : TextureBase
         // Format
         reader.BaseStream.Seek(0x1C, SeekOrigin.Begin);
         Format = new GPUTEXTURE_FETCH_CONSTANT().FromPacked(reader.ReadBytes(0x18));
+
+        reader.BaseStream.Seek(0x34, SeekOrigin.Begin);
+        FooterBytes = reader.ReadBytes((int)Math.Min(0xC, reader.BaseStream.Length - reader.BaseStream.Position));
+        if (FooterBytes.Length < 0xC)
+        {
+            Array.Resize(ref FooterBytes, 0xC);
+        }
     }
 }
 

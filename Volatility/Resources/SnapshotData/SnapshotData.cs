@@ -6,9 +6,6 @@ public class SnapshotData : BinaryResource
     private const int SnapshotChannelSize = 0xC;
     private const int SnapshotStatusSize = 0x8;
 
-    public override ResourceType ResourceType => ResourceType.SnapshotData;
-    public override Platform ResourcePlatform => Platform.Agnostic;
-
     public List<SnapshotChannelData> Channels = [];
     public List<SnapshotStatusData> SnapshotStatuses = [];
 
@@ -48,9 +45,10 @@ public class SnapshotData : BinaryResource
         SnapshotStatuses = reader.ParseSection(statusesOffset, snapshotCount * channelCount, SnapshotStatusData.Read);
     }
 
-    public SnapshotData() : base() { }
+    public SnapshotData() : base(ResourceType.SnapshotData) { }
 
-    public SnapshotData(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
+    public SnapshotData(string path, Endian endianness = Endian.Agnostic)
+        : base(ResourceType.SnapshotData, path, endianness) { }
 
     private int GetSnapshotCountForWrite()
     {

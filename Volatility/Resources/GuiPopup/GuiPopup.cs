@@ -2,25 +2,41 @@ using Volatility.Utilities;
 
 namespace Volatility.Resources;
 
-public class GuiPopup : Resource
+public class GuiPopup : TypedResource
 {
-    private const int HeaderSize = 0x8;
+    private const int HeaderSize = 0x40;
     private const int PopupStructSize = 0xC0;
+    private const int PopupOffsetEntrySize = sizeof(uint);
+    private const int HeaderAlignment = 0x40;
 
-    public List<Popup> Popups { get; } = [];
-
-    public override ResourceType ResourceType => ResourceType.GuiPopup;
-    public override Platform ResourcePlatform => Platform.Agnostic;
+    public List<Popup> Popups { get; set; } = [];
 
     public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness)
     {
         base.WriteToStream(writer, endianness);
 
-        long start = writer.BaseStream.Position;
-        writer.Write((uint)HeaderSize);
+        uint count = (uint)Popups.Count;
+        uint popupOffsetsStart = HeaderSize;
+        uint firstPopupOffset = AlignOffset(popupOffsetsStart + (count * PopupOffsetEntrySize), HeaderAlignment);
+        uint totalSize = firstPopupOffset + (count * PopupStructSize);
+
+        writer.Write(popupOffsetsStart);
         writer.Write((short)Popups.Count);
-        writer.Write((short)PopupStructSize);
-        writer.WriteSection(start + HeaderSize, Popups, Popup.Write);
+        writer.Write((short)totalSize);
+        writer.Write(new byte[HeaderSize - 0x8]);
+
+        for (int i = 0; i < Popups.Count; i++)
+        {
+            writer.Write(firstPopupOffset + (uint)(i * PopupStructSize));
+        }
+
+        PaddingUtilities.WritePadding(writer.BaseStream, HeaderAlignment);
+
+        for (int i = 0; i < Popups.Count; i++)
+        {
+            writer.BaseStream.Position = firstPopupOffset + (i * PopupStructSize);
+            Popup.Write(writer, Popups[i]);
+        }
     }
 
     public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness)
@@ -29,23 +45,58 @@ public class GuiPopup : Resource
 
         Popups.Clear();
 
-        long start = reader.BaseStream.Position;
         uint dataPtr = reader.ReadUInt32();
         short count = reader.ReadInt16();
-        short elemSize = reader.ReadInt16();
+        short totalSize = reader.ReadInt16();
 
-        if (elemSize != PopupStructSize)
+        if (dataPtr < HeaderSize)
         {
             throw new InvalidDataException(
-                $"GuiPopup element size mismatch! Expected 0x{PopupStructSize:X}, found 0x{elemSize:X}.");
+                $"GuiPopup data pointer mismatch! Expected >= 0x{HeaderSize:X}, found 0x{dataPtr:X}.");
         }
 
-        reader.ParseSection(start + dataPtr, count, Popup.Read, Popups);
+        long expectedMinimumSize = dataPtr + (count * PopupOffsetEntrySize);
+        if (reader.BaseStream.Length < expectedMinimumSize)
+        {
+            throw new InvalidDataException(
+                $"GuiPopup offset table exceeds file length. Needed 0x{expectedMinimumSize:X}, found 0x{reader.BaseStream.Length:X}.");
+        }
+
+        List<uint> popupOffsets = reader.ParseSection(dataPtr, count, r => r.ReadUInt32());
+        for (int i = 0; i < popupOffsets.Count; i++)
+        {
+            uint popupOffset = popupOffsets[i];
+            if (popupOffset == 0)
+            {
+                continue;
+            }
+
+            if (popupOffset + PopupStructSize > reader.BaseStream.Length)
+            {
+                throw new InvalidDataException(
+                    $"GuiPopup entry {i} at 0x{popupOffset:X} exceeds file length 0x{reader.BaseStream.Length:X}.");
+            }
+
+            reader.ParseSection(popupOffset, Popup.Read, out Popup popup);
+            Popups.Add(popup);
+        }
+
+        if (totalSize > 0 && totalSize != reader.BaseStream.Length)
+        {
+            Console.WriteLine($"WARNING: GuiPopup reported size 0x{totalSize:X}, actual size 0x{reader.BaseStream.Length:X}.");
+        }
     }
 
-    public GuiPopup() : base() { }
+    public GuiPopup() : base(ResourceType.GuiPopup) { }
 
-    public GuiPopup(string path, Endian endianness) : base(path, endianness) { }
+    public GuiPopup(string path, Endian endianness)
+        : base(ResourceType.GuiPopup, path, endianness) { }
+
+    private static uint AlignOffset(uint value, uint alignment)
+    {
+        uint remainder = value % alignment;
+        return remainder == 0 ? value : value + (alignment - remainder);
+    }
 
     public enum PopupStyle : int
     {
@@ -100,16 +151,25 @@ public class GuiPopup : Resource
         public string Button2Id;
         public PopupParamTypes Button2Param;
         public bool Button2ParamUsed;
+        [EditorHidden]
+        public byte[] NamePaddingBytes;
+        [EditorHidden]
+        public byte[] Button2PaddingBytes;
+        [EditorHidden]
+        public byte[] TrailingBytes;
 
         public static Popup Read(ResourceBinaryReader reader)
         {
             Popup popup = new()
             {
                 NameId = reader.ReadUInt64(),
-                Name = ResourceUtilities.ReadFixedString(reader, 13)
+                Name = ResourceUtilities.ReadFixedString(reader, 13),
+                NamePaddingBytes = new byte[0x3],
+                Button2PaddingBytes = new byte[0x3],
+                TrailingBytes = new byte[0x7]
             };
 
-            reader.BaseStream.Seek(0x3, SeekOrigin.Current);
+            popup.NamePaddingBytes = reader.ReadBytes(0x3);
 
             popup.Style = (PopupStyle)reader.ReadInt32();
             popup.Icon = (PopupIcons)reader.ReadInt32();
@@ -122,13 +182,11 @@ public class GuiPopup : Resource
             popup.Button1Param = (PopupParamTypes)reader.ReadInt32();
             popup.Button1ParamUsed = reader.ReadByte() != 0;
             popup.Button2Id = ResourceUtilities.ReadFixedString(reader, 32);
-
-            reader.BaseStream.Seek(0x3, SeekOrigin.Current);
+            popup.Button2PaddingBytes = reader.ReadBytes(0x3);
 
             popup.Button2Param = (PopupParamTypes)reader.ReadInt32();
             popup.Button2ParamUsed = reader.ReadByte() != 0;
-
-            reader.BaseStream.Seek(0x7, SeekOrigin.Current);
+            popup.TrailingBytes = reader.ReadBytes(0x7);
 
             return popup;
         }
@@ -137,7 +195,7 @@ public class GuiPopup : Resource
         {
             writer.Write(popup.NameId);
             ResourceUtilities.WriteFixedString(writer, popup.Name, 13);
-            writer.Write(new byte[0x3]);
+            writer.WriteFixedBytes(popup.NamePaddingBytes, 0x3);
             writer.Write((int)popup.Style);
             writer.Write((int)popup.Icon);
             ResourceUtilities.WriteFixedString(writer, popup.TitleId, 32);
@@ -149,10 +207,10 @@ public class GuiPopup : Resource
             writer.Write((int)popup.Button1Param);
             writer.Write((byte)(popup.Button1ParamUsed ? 1 : 0));
             ResourceUtilities.WriteFixedString(writer, popup.Button2Id, 32);
-            writer.Write(new byte[0x3]);
+            writer.WriteFixedBytes(popup.Button2PaddingBytes, 0x3);
             writer.Write((int)popup.Button2Param);
             writer.Write((byte)(popup.Button2ParamUsed ? 1 : 0));
-            writer.Write(new byte[0x7]);
+            writer.WriteFixedBytes(popup.TrailingBytes, 0x7);
         }
     }
 }

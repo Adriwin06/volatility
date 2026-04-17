@@ -7,25 +7,46 @@ namespace Volatility.Resources;
 // Learn More:
 // https://burnout.wiki/wiki/Binary_File
 
-public class BinaryResource : Resource
+public class BinaryResource : TypedResource
 {
-    public override ResourceType ResourceType => ResourceType.BinaryFile;
-    
     public uint DataSize { get; set; }
     public uint DataOffset { get; set; }
 
     public BinaryResource(uint dataOffset, uint dataSize)
+        : this(ResourceType.BinaryFile, dataOffset, dataSize)
+    {
+    }
+
+    protected BinaryResource(ResourceType resourceType, uint dataOffset, uint dataSize)
+        : base(resourceType)
     {
         DataSize = dataSize;
         DataOffset = dataOffset == 0 ? 0x10u : dataOffset;
     }
 
-    public BinaryResource() : base()
+    public BinaryResource() : this(ResourceType.BinaryFile)
+    {
+    }
+
+    protected BinaryResource(ResourceType resourceType)
+        : base(resourceType)
     {
         DataOffset = 0x10;
     }
-    
-    public BinaryResource(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
+
+    public BinaryResource(string path, Endian endianness = Endian.Agnostic)
+        : this(ResourceType.BinaryFile, path, endianness)
+    {
+    }
+
+    protected BinaryResource(ResourceType resourceType, string path, Endian endianness = Endian.Agnostic)
+        : base(resourceType, path, endianness)
+    {
+        if (DataOffset == 0)
+        {
+            DataOffset = 0x10;
+        }
+    }
 
     public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness = Endian.Agnostic)
     {

@@ -1,11 +1,7 @@
 ﻿namespace Volatility.Resources;
 
-public class ShaderBase : Resource
+public class ShaderBase : TypedResource
 {
-    public override ResourceType ResourceType => ResourceType.Shader;
-    public override Endian ResourceEndian => Endian.Agnostic;
-    public override Platform ResourcePlatform => Platform.Agnostic;
-
     [EditorCategory("Shader/Source"), EditorLabel("Source File"), EditorTooltip("Relative path to the HLSL source file.")]
     public string? ShaderSourcePath { get; set; }
 
@@ -28,15 +24,6 @@ public class ShaderBase : Resource
 
     [EditorCategory("Shader/Compile"), EditorLabel("Additional Arguments"), EditorTooltip("Extra dxc command-line arguments.")]
     public List<string> AdditionalArguments { get; set; } = [];
-
-    public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness)
-    {
-        base.WriteToStream(writer, endianness);
-    }
-    public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness)
-    {
-        base.ParseFromStream(reader, endianness);
-    }
 
     public IReadOnlyList<ShaderStageCompile> GetCompileStages()
     {
@@ -90,11 +77,12 @@ public class ShaderBase : Resource
         return true;
     }
 
-    public ShaderBase() : base() { }
+    public ShaderBase() : base(ResourceType.Shader) { }
 
-    public ShaderBase(string path) : base(path) { }
+    public ShaderBase(string path) : base(ResourceType.Shader, path) { }
 
-    public ShaderBase(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
+    public ShaderBase(string path, Endian endianness = Endian.Agnostic)
+        : base(ResourceType.Shader, path, endianness) { }
 }
 
 public enum ShaderStageType

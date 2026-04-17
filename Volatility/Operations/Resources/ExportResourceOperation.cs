@@ -1,6 +1,5 @@
 using Volatility.Resources;
 using Volatility.Utilities;
-
 namespace Volatility.Operations.Resources;
 
 internal class ExportResourceOperation
@@ -31,6 +30,8 @@ internal class ExportResourceOperation
                 resource.WriteToStream(writer);
                 break;
         }
+
+        WriteExternalImportsYaml(resource, outputPath);
 
         if (resource is ShaderBase shader)
         {
@@ -68,6 +69,39 @@ internal class ExportResourceOperation
         }
 
         return Task.CompletedTask;
+    }
+
+    private static void WriteExternalImportsYaml(Resource resource, string outputPath)
+    {
+        List<KeyValuePair<long, ResourceImport>> imports = resource switch
+        {
+            Model model => model.GetExternalImports().ToList(),
+            InstanceList instanceList => instanceList.GetExternalImports().ToList(),
+            _ => []
+        };
+
+        string importsPath = Path.Combine(
+            Path.GetDirectoryName(outputPath) ?? string.Empty,
+            Path.GetFileNameWithoutExtension(outputPath) + "_imports.yaml");
+
+        if (imports.Count == 0)
+        {
+            if (File.Exists(importsPath))
+            {
+                File.Delete(importsPath);
+            }
+
+            return;
+        }
+
+        List<string> lines = new(imports.Count);
+        foreach (KeyValuePair<long, ResourceImport> entry in imports)
+        {
+            ulong resourceId = ResourceUtilities.ResolveResourceID(entry.Value);
+            lines.Add($"- \"0x{entry.Key:x8}\": \"{resourceId:X8}\"");
+        }
+
+        File.WriteAllLines(importsPath, lines);
     }
 
     private static string GetShaderProgramBufferPath(

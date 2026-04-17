@@ -18,8 +18,6 @@ public class Splicer : BinaryResource
     private const int SpliceHeaderSize = 0x18;
     private const int SampleRefSize = 0x2C;
 
-    public override ResourceType ResourceType => ResourceType.Splicer;
-
     public List<SpliceData> Splices = [];
 
     // Only gets populated when parsing from a stream, or when
@@ -180,9 +178,10 @@ public class Splicer : BinaryResource
         return _samples;
     }
 
-    public Splicer() : base() { }
+    public Splicer() : base(ResourceType.Splicer) { }
 
-    public Splicer(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
+    public Splicer(string path, Endian endianness = Endian.Agnostic)
+        : base(ResourceType.Splicer, path, endianness) { }
 
     private static List<SpliceSample> ReadSamples(
         ResourceBinaryReader reader,

@@ -2,15 +2,13 @@ using Volatility.Utilities;
 
 namespace Volatility.Resources;
 
-public class EnvironmentTimeline : Resource
+public class EnvironmentTimeline : TypedResource
 {
     private const int HeaderSize = 0x10;
     private const int SectionAlignment = 0x10;
     private const int KeyframeTimeSize = sizeof(float);
     private const int KeyframeReferencePlaceholderSize = sizeof(uint);
     private const int ImportEntrySize = 0x10;
-
-    public override ResourceType ResourceType => ResourceType.EnvironmentTimeLine;
 
     public LocationData[] Locations = [];
 
@@ -108,9 +106,10 @@ public class EnvironmentTimeline : Resource
         Locations = reader.ParseSection((long)locationsPtr, locationCount, r => ReadLocation(r, arch)).ToArray();
     }
 
-    public EnvironmentTimeline() : base() { }
+    public EnvironmentTimeline() : base(ResourceType.EnvironmentTimeLine) { }
 
-    public EnvironmentTimeline(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
+    public EnvironmentTimeline(string path, Endian endianness = Endian.Agnostic)
+        : base(ResourceType.EnvironmentTimeLine, path, endianness) { }
 
     private static int GetLocationStructSize(Arch arch)
     {

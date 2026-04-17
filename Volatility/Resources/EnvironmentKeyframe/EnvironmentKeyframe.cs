@@ -7,10 +7,8 @@ namespace Volatility.Resources;
 // Learn More:
 // https://burnout.wiki/wiki/Environment_Keyframe
 
-public class EnvironmentKeyframe : Resource 
+public class EnvironmentKeyframe : TypedResource 
 {
-    public override ResourceType ResourceType => ResourceType.EnvironmentKeyframe;
-    
     public BloomData BloomSettings;
     public VignetteData VignetteSettings;
     public TintData TintSettings;
@@ -18,9 +16,10 @@ public class EnvironmentKeyframe : Resource
     public LightingData LightingSettings;
     public CloudsData CloudSettings;
 
-    public EnvironmentKeyframe() : base() { }
+    public EnvironmentKeyframe() : base(ResourceType.EnvironmentKeyframe) { }
 
-    public EnvironmentKeyframe(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { } 
+    public EnvironmentKeyframe(string path, Endian endianness = Endian.Agnostic)
+        : base(ResourceType.EnvironmentKeyframe, path, endianness) { } 
 
     public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness = Endian.Agnostic)
     {

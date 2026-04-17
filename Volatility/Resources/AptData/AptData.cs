@@ -2,19 +2,12 @@
 
 namespace Volatility.Resources;
 
-public class AptData : Resource
+public class AptData : TypedResource
 {
-    public override ResourceType ResourceType => ResourceType.AptData;
-    public override Platform ResourcePlatform => Platform.Agnostic;
-
     public string MovieName;
     public string BaseComponentName;
     public GuiGeometryObject GuiGeometry;
 
-    public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness = Endian.Agnostic)
-    {
-        base.WriteToStream(writer);
-    }
     public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness = Endian.Agnostic)
     {
         base.ParseFromStream(reader, endianness);
@@ -103,9 +96,10 @@ public class AptData : Resource
         };
     }
 
-    public AptData() : base() { }
+    public AptData() : base(ResourceType.AptData) { }
 
-    public AptData(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
+    public AptData(string path, Endian endianness = Endian.Agnostic)
+        : base(ResourceType.AptData, path, endianness) { }
 }
 
 public struct GuiGeometryObject

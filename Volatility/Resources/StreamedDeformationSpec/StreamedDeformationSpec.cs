@@ -312,13 +312,11 @@ public struct GlassPaneSpec
     }
 }
 
-public class StreamedDeformationSpec : Resource
+public class StreamedDeformationSpec : TypedResource
 {
     public const int HeaderSize32 = 0x6B0;
     public const int HeaderSize64 = 0x6F0;
     private const int SectionAlignment = 0x10;
-
-    public override ResourceType ResourceType => ResourceType.StreamedDeformationSpec;
 
     public int VersionNumber { get; set; }
     public ulong TagPointDataOffset { get; set; }
@@ -578,9 +576,10 @@ public class StreamedDeformationSpec : Resource
         writer.WriteSection(LightTagsInfo.Offset, LightTags, WriteLocatorPointSpec);
     }
 
-    public StreamedDeformationSpec() : base() { }
+    public StreamedDeformationSpec() : base(ResourceType.StreamedDeformationSpec) { }
 
-    public StreamedDeformationSpec(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
+    public StreamedDeformationSpec(string path, Endian endianness = Endian.Agnostic)
+        : base(ResourceType.StreamedDeformationSpec, path, endianness) { }
 
     // Section writers
 

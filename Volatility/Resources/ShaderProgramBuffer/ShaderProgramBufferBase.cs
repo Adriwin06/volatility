@@ -1,21 +1,9 @@
 ﻿namespace Volatility.Resources;
 
-public class ShaderProgramBufferBase : Resource
+public class ShaderProgramBufferBase : TypedResource
 {
-    public override ResourceType ResourceType => ResourceType.RwShaderProgramBuffer;
-    public override Endian ResourceEndian => Endian.Agnostic;
-    public override Platform ResourcePlatform => Platform.Agnostic;
+    public ShaderProgramBufferBase() : base(ResourceType.RwShaderProgramBuffer) { }
 
-    public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness)
-    {
-        base.WriteToStream(writer, endianness);
-    }
-    public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness)
-    {
-        base.ParseFromStream(reader, endianness);
-    }
-
-    public ShaderProgramBufferBase() : base() { }
-
-    public ShaderProgramBufferBase(string path) : base(path) { }
+    public ShaderProgramBufferBase(string path)
+        : base(ResourceType.RwShaderProgramBuffer, path) { }
 }

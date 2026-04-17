@@ -11,7 +11,7 @@ namespace Volatility.Resources;
 // Learn More:
 // https://burnout.wiki/wiki/Renderable
 
-public abstract class RenderableBase : Resource
+public abstract class RenderableBase : TypedResource
 {
     public Vector3Plus BoundingSphere;
     public ushort Version;
@@ -20,8 +20,6 @@ public abstract class RenderableBase : Resource
     public BitArray Flags = new BitArray(16);
     public uint IndexBuffer;                    // Only on PC platforms
     public uint VertexBuffer;                   // Only on PC platforms
-
-    public override ResourceType ResourceType => ResourceType.Renderable;
 
     public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness = Endian.Agnostic)
     {
@@ -41,7 +39,10 @@ public abstract class RenderableBase : Resource
         // TODO: Parse RenderableMeshes
     }
 
-    public RenderableBase(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
+    protected RenderableBase() : base(ResourceType.Renderable) { }
+
+    protected RenderableBase(string path, Endian endianness = Endian.Agnostic)
+        : base(ResourceType.Renderable, path, endianness) { }
 }
 
 

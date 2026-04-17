@@ -9,11 +9,8 @@ namespace Volatility.Resources;
 // Learn More:
 // https://burnout.wiki/wiki/AttribSysVault
 
-public class AttribSysVault : Resource
+public class AttribSysVault : TypedResource
 {
-    public override ResourceType ResourceType => ResourceType.AttribSysVault;
-    public override Platform ResourcePlatform => Platform.Agnostic;
-
     public ulong VltDataOffset { get; set; }
     public uint VltSizeInBytes { get; set; }
     public ulong BinDataOffset { get; set; }
@@ -121,9 +118,10 @@ public class AttribSysVault : Resource
         throw new NotImplementedException("Writing AttribSysVault is not implemented.");
     }
 
-    public AttribSysVault() : base() { }
+    public AttribSysVault() : base(ResourceType.AttribSysVault) { }
 
-    public AttribSysVault(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
+    public AttribSysVault(string path, Endian endianness = Endian.Agnostic)
+        : base(ResourceType.AttribSysVault, path, endianness) { }
 
     private void ParseVlt(EndianAwareBinaryReader reader, List<PendingAttribute> pendingAttributes)
     {

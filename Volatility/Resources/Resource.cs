@@ -46,6 +46,11 @@ public abstract class Resource
 
     public Resource(string path, Endian endianness = Endian.Agnostic)
     {
+        InitializeFromPath(path, endianness);
+    }
+
+    protected void InitializeFromPath(string path, Endian endianness = Endian.Agnostic)
+    {
         if (string.IsNullOrEmpty(path))
             return;
 
