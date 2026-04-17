@@ -1,5 +1,7 @@
 ﻿namespace Volatility.Resources;
 
+[ResourceDefinition(ResourceType.Shader)]
+[ResourceRegistration(RegistrationPlatforms.Agnostic)]
 public class ShaderBase : TypedResource
 {
     [EditorCategory("Shader/Source"), EditorLabel("Source File"), EditorTooltip("Relative path to the HLSL source file.")]
@@ -77,12 +79,12 @@ public class ShaderBase : TypedResource
         return true;
     }
 
-    public ShaderBase() : base(ResourceType.Shader) { }
+    public ShaderBase() : base() { }
 
-    public ShaderBase(string path) : base(ResourceType.Shader, path) { }
+    public ShaderBase(string path) : base(path) { }
 
     public ShaderBase(string path, Endian endianness = Endian.Agnostic)
-        : base(ResourceType.Shader, path, endianness) { }
+        : base(path, endianness) { }
 }
 
 public enum ShaderStageType

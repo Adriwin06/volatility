@@ -1,9 +1,10 @@
 ﻿namespace Volatility.Resources;
 
+[ResourceDefinition(ResourceType.RwShaderProgramBuffer)]
 public class ShaderProgramBufferBase : TypedResource
 {
-    public ShaderProgramBufferBase() : base(ResourceType.RwShaderProgramBuffer) { }
+    public ShaderProgramBufferBase() : base() { }
 
     public ShaderProgramBufferBase(string path)
-        : base(ResourceType.RwShaderProgramBuffer, path) { }
+        : base(path) { }
 }

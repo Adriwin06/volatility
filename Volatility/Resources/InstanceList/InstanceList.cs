@@ -11,6 +11,8 @@ namespace Volatility.Resources;
 // Learn More:
 // https://burnout.wiki/wiki/Instance_List
 
+[ResourceDefinition(ResourceType.InstanceList)]
+[ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
 public class InstanceList : TypedResource
 {
     private const int HeaderSize = 0x10;
@@ -22,10 +24,10 @@ public class InstanceList : TypedResource
     [EditorLabel("Instances"), EditorCategory("Instance List"), EditorTooltip("The list of instances in this list.")]
     public List<Instance> Instances = [];
 
-    public InstanceList() : base(ResourceType.InstanceList) { }
+    public InstanceList() : base() { }
 
     public InstanceList(string path, Endian endianness = Endian.Agnostic)
-        : base(ResourceType.InstanceList, path, endianness) { }
+        : base(path, endianness) { }
 
     public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness = Endian.Agnostic)
     {

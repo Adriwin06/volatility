@@ -8,6 +8,7 @@ using static Volatility.Utilities.X360TextureUtilities;
 
 namespace Volatility.Resources;
 
+[ResourceRegistration(RegistrationPlatforms.X360, PullAll = true)]
 public class TextureX360 : TextureBase
 {
     public override Endian ResourceEndian => Endian.BE;

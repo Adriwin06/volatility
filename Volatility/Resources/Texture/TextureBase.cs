@@ -8,6 +8,7 @@
 // Learn More:
 // https://burnout.wiki/wiki/Texture
 
+[ResourceDefinition(ResourceType.Texture)]
 public abstract class TextureBase : TypedResource
 {
     [EditorCategory("Texture"), EditorLabel("Width"), EditorTooltip("The target width of the texture.")]
@@ -92,10 +93,10 @@ public abstract class TextureBase : TypedResource
         PushInternalFlags();
     }
 
-    protected TextureBase() : base(ResourceType.Texture) => Depth = 1;
+    protected TextureBase() : base() => Depth = 1;
 
     protected TextureBase(string path, Endian endianness = Endian.Agnostic)
-        : base(ResourceType.Texture, path, endianness) { }
+        : base(path, endianness) { }
 }
 // BPR formatted but converted for each platform
 public enum DIMENSION : int

@@ -2,6 +2,7 @@
 
 namespace Volatility.Resources;
 
+[ResourceRegistration(RegistrationPlatforms.BPR, PullAll = true)]
 public class TextureBPR : TextureBase
 {
     public override Endian ResourceEndian => Endian.LE;

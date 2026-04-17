@@ -2,6 +2,8 @@ using Volatility.Utilities;
 
 namespace Volatility.Resources;
 
+[ResourceDefinition(ResourceType.GuiPopup)]
+[ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
 public class GuiPopup : TypedResource
 {
     private const int HeaderSize = 0x40;
@@ -87,10 +89,10 @@ public class GuiPopup : TypedResource
         }
     }
 
-    public GuiPopup() : base(ResourceType.GuiPopup) { }
+    public GuiPopup() : base() { }
 
     public GuiPopup(string path, Endian endianness)
-        : base(ResourceType.GuiPopup, path, endianness) { }
+        : base(path, endianness) { }
 
     private static uint AlignOffset(uint value, uint alignment)
     {

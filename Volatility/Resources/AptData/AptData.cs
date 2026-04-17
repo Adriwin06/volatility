@@ -2,6 +2,8 @@
 
 namespace Volatility.Resources;
 
+[ResourceDefinition(ResourceType.AptData)]
+[ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
 public class AptData : TypedResource
 {
     public string MovieName;
@@ -96,10 +98,10 @@ public class AptData : TypedResource
         };
     }
 
-    public AptData() : base(ResourceType.AptData) { }
+    public AptData() : base() { }
 
     public AptData(string path, Endian endianness = Endian.Agnostic)
-        : base(ResourceType.AptData, path, endianness) { }
+        : base(path, endianness) { }
 }
 
 public struct GuiGeometryObject

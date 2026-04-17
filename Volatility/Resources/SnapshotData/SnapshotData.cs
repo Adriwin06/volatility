@@ -1,5 +1,7 @@
 namespace Volatility.Resources;
 
+[ResourceDefinition(ResourceType.SnapshotData)]
+[ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
 public class SnapshotData : BinaryResource
 {
     private const int SnapshotHeaderSize = 0x10;
@@ -45,10 +47,10 @@ public class SnapshotData : BinaryResource
         SnapshotStatuses = reader.ParseSection(statusesOffset, snapshotCount * channelCount, SnapshotStatusData.Read);
     }
 
-    public SnapshotData() : base(ResourceType.SnapshotData) { }
+    public SnapshotData() : base() { }
 
     public SnapshotData(string path, Endian endianness = Endian.Agnostic)
-        : base(ResourceType.SnapshotData, path, endianness) { }
+        : base(path, endianness) { }
 
     private int GetSnapshotCountForWrite()
     {

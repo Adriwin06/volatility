@@ -312,6 +312,8 @@ public struct GlassPaneSpec
     }
 }
 
+[ResourceDefinition(ResourceType.StreamedDeformationSpec)]
+[ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
 public class StreamedDeformationSpec : TypedResource
 {
     public const int HeaderSize32 = 0x6B0;
@@ -576,10 +578,10 @@ public class StreamedDeformationSpec : TypedResource
         writer.WriteSection(LightTagsInfo.Offset, LightTags, WriteLocatorPointSpec);
     }
 
-    public StreamedDeformationSpec() : base(ResourceType.StreamedDeformationSpec) { }
+    public StreamedDeformationSpec() : base() { }
 
     public StreamedDeformationSpec(string path, Endian endianness = Endian.Agnostic)
-        : base(ResourceType.StreamedDeformationSpec, path, endianness) { }
+        : base(path, endianness) { }
 
     // Section writers
 

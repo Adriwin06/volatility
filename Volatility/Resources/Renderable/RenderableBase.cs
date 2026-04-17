@@ -11,6 +11,7 @@ namespace Volatility.Resources;
 // Learn More:
 // https://burnout.wiki/wiki/Renderable
 
+[ResourceDefinition(ResourceType.Renderable)]
 public abstract class RenderableBase : TypedResource
 {
     public Vector3Plus BoundingSphere;
@@ -39,10 +40,10 @@ public abstract class RenderableBase : TypedResource
         // TODO: Parse RenderableMeshes
     }
 
-    protected RenderableBase() : base(ResourceType.Renderable) { }
+    protected RenderableBase() : base() { }
 
     protected RenderableBase(string path, Endian endianness = Endian.Agnostic)
-        : base(ResourceType.Renderable, path, endianness) { }
+        : base(path, endianness) { }
 }
 
 

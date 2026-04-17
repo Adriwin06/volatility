@@ -11,6 +11,8 @@ namespace Volatility.Resources;
 // Learn More:
 // https://burnout.wiki/wiki/Splicer
 
+[ResourceDefinition(ResourceType.Splicer)]
+[ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
 public class Splicer : BinaryResource
 {
     private const int Version = 1;
@@ -178,10 +180,10 @@ public class Splicer : BinaryResource
         return _samples;
     }
 
-    public Splicer() : base(ResourceType.Splicer) { }
+    public Splicer() : base() { }
 
     public Splicer(string path, Endian endianness = Endian.Agnostic)
-        : base(ResourceType.Splicer, path, endianness) { }
+        : base(path, endianness) { }
 
     private static List<SpliceSample> ReadSamples(
         ResourceBinaryReader reader,

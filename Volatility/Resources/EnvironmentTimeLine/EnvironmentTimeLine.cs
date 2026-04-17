@@ -2,6 +2,8 @@ using Volatility.Utilities;
 
 namespace Volatility.Resources;
 
+[ResourceDefinition(ResourceType.EnvironmentTimeLine)]
+[ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
 public class EnvironmentTimeline : TypedResource
 {
     private const int HeaderSize = 0x10;
@@ -106,10 +108,10 @@ public class EnvironmentTimeline : TypedResource
         Locations = reader.ParseSection((long)locationsPtr, locationCount, r => ReadLocation(r, arch)).ToArray();
     }
 
-    public EnvironmentTimeline() : base(ResourceType.EnvironmentTimeLine) { }
+    public EnvironmentTimeline() : base() { }
 
     public EnvironmentTimeline(string path, Endian endianness = Endian.Agnostic)
-        : base(ResourceType.EnvironmentTimeLine, path, endianness) { }
+        : base(path, endianness) { }
 
     private static int GetLocationStructSize(Arch arch)
     {

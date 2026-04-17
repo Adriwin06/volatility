@@ -1,3 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
+
 namespace Volatility.Resources;
 
 public static class ResourceFactory
@@ -8,28 +11,28 @@ public static class ResourceFactory
     {
         ResourceCreatorRegistry registry = new();
 
-        registry.AddWithPullAll(ResourceType.Texture, Platform.BPR, static path => new TextureBPR(path));
-        registry.AddWithPullAll(ResourceType.Texture, Platform.TUB, static path => new TexturePC(path));
-        registry.AddWithPullAll(ResourceType.Texture, Platform.X360, static path => new TextureX360(path));
-        registry.AddWithPullAll(ResourceType.Texture, Platform.PS3, static path => new TexturePS3(path));
-
-        registry.AddEndianMapped(ResourceType.Splicer, static (path, endian) => new Splicer(path, endian));
-        registry.Add(ResourceType.Renderable, Platform.BPR, static path => new RenderableBPR(path));
-        registry.Add(ResourceType.Renderable, Platform.TUB, static path => new RenderablePC(path));
-        registry.Add(ResourceType.Renderable, Platform.X360, static path => new RenderableX360(path));
-        registry.Add(ResourceType.Renderable, Platform.PS3, static path => new RenderablePS3(path));
-        registry.AddEndianMapped(ResourceType.InstanceList, static (path, endian) => new InstanceList(path, endian));
-        registry.AddEndianMapped(ResourceType.Model, static (path, endian) => new Model(path, endian));
-        registry.AddEndianMapped(ResourceType.EnvironmentKeyframe, static (path, endian) => new EnvironmentKeyframe(path, endian));
-        registry.AddEndianMapped(ResourceType.EnvironmentTimeLine, static (path, endian) => new EnvironmentTimeline(path, endian));
-        registry.AddEndianMapped(ResourceType.SnapshotData, static (path, endian) => new SnapshotData(path, endian));
-        registry.AddEndianMapped(ResourceType.AttribSysVault, static (path, endian) => new AttribSysVault(path, endian));
-        registry.AddEndianMapped(ResourceType.StreamedDeformationSpec, static (path, endian) => new StreamedDeformationSpec(path, endian));
-        registry.AddEndianMapped(ResourceType.AptData, static (path, endian) => new AptData(path, endian));
-        registry.AddEndianMapped(ResourceType.GuiPopup, static (path, endian) => new GuiPopup(path, endian));
-
-        registry.Add(ResourceType.Shader, Platform.Agnostic, static path => new ShaderBase(path));
-        registry.Add(ResourceType.Shader, Platform.TUB, static path => new ShaderPC(path));
+        AddRegisteredResource<BinaryResource>(registry);
+        AddRegisteredResource<TextureBPR>(registry);
+        AddRegisteredResource<TexturePC>(registry);
+        AddRegisteredResource<TextureX360>(registry);
+        AddRegisteredResource<TexturePS3>(registry);
+        AddRegisteredResource<Splicer>(registry);
+        AddRegisteredResource<RenderableBPR>(registry);
+        AddRegisteredResource<RenderablePC>(registry);
+        AddRegisteredResource<RenderableX360>(registry);
+        AddRegisteredResource<RenderablePS3>(registry);
+        AddRegisteredResource<InstanceList>(registry);
+        AddRegisteredResource<Model>(registry);
+        AddRegisteredResource<EnvironmentKeyframe>(registry);
+        AddRegisteredResource<EnvironmentTimeline>(registry);
+        AddRegisteredResource<SnapshotData>(registry);
+        AddRegisteredResource<AttribSysVault>(registry);
+        AddRegisteredResource<StreamedDeformationSpec>(registry);
+        AddRegisteredResource<AptData>(registry);
+        AddRegisteredResource<GuiPopup>(registry);
+        AddRegisteredResource<ShaderBase>(registry);
+        AddRegisteredResource<ShaderPC>(registry);
+        AddRegisteredResource<ShaderProgramBufferBPR>(registry);
 
         return registry.Build();
     }
@@ -48,6 +51,13 @@ public static class ResourceFactory
         }
 
         throw new InvalidPlatformException($"The '{resourceType}' type is not supported for the '{platform}' platform.");
+    }
+
+    private static void AddRegisteredResource<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] TResource>(
+        ResourceCreatorRegistry registry)
+        where TResource : Resource
+    {
+        registry.AddRegistrations(typeof(TResource));
     }
 
     private sealed class ResourceCreatorRegistry
@@ -74,29 +84,119 @@ public static class ResourceFactory
             });
         }
 
-        public void AddWithPullAll<TResource>(
-            ResourceType resourceType,
-            Platform platform,
-            Func<string, TResource> creator)
-            where TResource : Resource
+        public void AddRegistrations(
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type resourceClass)
         {
-            Add(resourceType, platform, creator, static resource => resource.PullAll());
-        }
+            ResourceType resourceType = ResourceMetadata.GetResourceType(resourceClass);
+            ResourceRegistrationAttribute[] registrations = resourceClass
+                .GetCustomAttributes<ResourceRegistrationAttribute>(inherit: false)
+                .ToArray();
 
-        public void AddEndianMapped<TResource>(
-            ResourceType resourceType,
-            Func<string, Endian, TResource> creator)
-            where TResource : Resource
-        {
-            Add(resourceType, Platform.BPR, path => creator(path, Endian.LE));
-            Add(resourceType, Platform.TUB, path => creator(path, Endian.LE));
-            Add(resourceType, Platform.X360, path => creator(path, Endian.BE));
-            Add(resourceType, Platform.PS3, path => creator(path, Endian.BE));
+            foreach (ResourceRegistrationAttribute registration in registrations)
+            {
+                foreach (Platform platform in ExpandPlatforms(registration.Platforms))
+                {
+                    Func<string, Resource> creator = registration.EndianMapped
+                        ? CreateEndianMappedCreator(resourceClass, platform)
+                        : CreatePathCreator(resourceClass);
+
+                    if (registration.PullAll)
+                    {
+                        creator = WrapWithPullAll(creator);
+                    }
+
+                    AddCreator(resourceType, platform, creator);
+                }
+            }
         }
 
         public Dictionary<(ResourceType, Platform), Func<string, Resource>> Build()
         {
             return _creators;
+        }
+
+        private static Func<string, Resource> CreatePathCreator(
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type resourceClass)
+        {
+            ConstructorInfo? stringCtor = resourceClass.GetConstructor([typeof(string)]);
+            if (stringCtor != null)
+            {
+                return path => (Resource)stringCtor.Invoke([path]);
+            }
+
+            ConstructorInfo? stringEndianCtor = resourceClass.GetConstructor([typeof(string), typeof(Endian)]);
+            if (stringEndianCtor != null)
+            {
+                return path => (Resource)stringEndianCtor.Invoke([path, Endian.Agnostic]);
+            }
+
+            throw new InvalidOperationException(
+                $"Could not find a usable string constructor for resource class '{resourceClass.FullName}'.");
+        }
+
+        private static Func<string, Resource> CreateEndianMappedCreator(
+            [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors)] Type resourceClass,
+            Platform platform)
+        {
+            if (platform == Platform.Agnostic)
+            {
+                throw new InvalidOperationException(
+                    $"Resource class '{resourceClass.FullName}' cannot use endian-mapped registration with Platform.Agnostic.");
+            }
+
+            ConstructorInfo? constructor = resourceClass.GetConstructor([typeof(string), typeof(Endian)]);
+            if (constructor == null)
+            {
+                throw new InvalidOperationException(
+                    $"Resource class '{resourceClass.FullName}' must expose a (string path, Endian endianness) constructor for endian-mapped registration.");
+            }
+
+            Endian endianness = platform switch
+            {
+                Platform.BPR or Platform.TUB => Endian.LE,
+                Platform.X360 or Platform.PS3 => Endian.BE,
+                _ => throw new InvalidOperationException($"No default endianness mapping exists for platform '{platform}'."),
+            };
+
+            return path => (Resource)constructor.Invoke([path, endianness]);
+        }
+
+        private static Func<string, Resource> WrapWithPullAll(Func<string, Resource> creator)
+        {
+            return path =>
+            {
+                Resource resource = creator(path);
+                resource.PullAll();
+                return resource;
+            };
+        }
+
+        private static IEnumerable<Platform> ExpandPlatforms(RegistrationPlatforms platforms)
+        {
+            if ((platforms & RegistrationPlatforms.Agnostic) != 0)
+            {
+                yield return Platform.Agnostic;
+            }
+
+            if ((platforms & RegistrationPlatforms.BPR) != 0)
+            {
+                yield return Platform.BPR;
+            }
+
+            if ((platforms & RegistrationPlatforms.TUB) != 0)
+            {
+                yield return Platform.TUB;
+            }
+
+            if ((platforms & RegistrationPlatforms.X360) != 0)
+            {
+                yield return Platform.X360;
+            }
+
+            if ((platforms & RegistrationPlatforms.PS3) != 0)
+            {
+                yield return Platform.PS3;
+            }
         }
     }
 }

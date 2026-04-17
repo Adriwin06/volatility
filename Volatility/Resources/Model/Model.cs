@@ -9,6 +9,8 @@ namespace Volatility.Resources;
 // Learn More:
 // https://burnout.wiki/wiki/Model
 
+[ResourceDefinition(ResourceType.Model)]
+[ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
 public class Model : TypedResource
 {
     private const int HeaderSize = 0x14;
@@ -109,10 +111,10 @@ public class Model : TypedResource
         }
     }
 
-    public Model() : base(ResourceType.Model) { }
+    public Model() : base() { }
 
     public Model(string path, Endian endianness = Endian.Agnostic)
-        : base(ResourceType.Model, path, endianness) { }
+        : base(path, endianness) { }
 
     private static ModelData ReadModelData(
         ResourceBinaryReader reader,
