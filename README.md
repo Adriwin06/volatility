@@ -30,3 +30,4 @@ NOTE: This may not be entirely comprehensive. Run "help" for a full list of comm
 #### Autotest
 - Runs automatic tests to ensure the application is working.
 - When provided a path & format, will import, export, then reimport specified file to ensure IO parity.
+- When provided game path(s), roundtrip tests now include exact binary parity checks between original and exported files.

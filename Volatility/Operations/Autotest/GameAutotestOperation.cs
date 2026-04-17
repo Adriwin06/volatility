@@ -215,6 +215,8 @@ internal sealed class GameAutotestOperation
         GameAutotestSummary summary)
     {
         string caseName = $"{candidate.ResourceType}:{candidate.DisplayName}";
+        string? exportPath = null;
+        bool binaryParityRecorded = false;
 
         try
         {
@@ -222,8 +224,18 @@ internal sealed class GameAutotestOperation
             await saveOperation.ExecuteAsync(firstImport.Resource, firstImport.ResourcePath);
 
             Resource loaded = await loadOperation.ExecuteAsync(firstImport.ResourcePath, candidate.ResourceType, game.Platform);
-            string exportPath = Path.Combine(exportsRoot, Path.GetFileName(candidate.SourcePath));
+            exportPath = Path.Combine(exportsRoot, Path.GetFileName(candidate.SourcePath));
             await exportOperation.ExecuteAsync(loaded, exportPath, game.Platform);
+
+            BinaryComparisonResult binaryComparison = CompareFilesExactly(candidate.SourcePath, exportPath);
+            AddCase(summary, new GameAutotestCaseResult(
+                game.Name,
+                caseName,
+                "binaryparity",
+                binaryComparison.Matches ? "PASS" : "FAIL",
+                binaryComparison.Details,
+                TestedResourceType: candidate.ResourceType));
+            binaryParityRecorded = true;
 
             ImportResourceResult secondImport = await importPass2.ExecuteAsync(candidate.ResourceType, game.Platform, exportPath, isX64: false);
             await saveOperation.ExecuteAsync(secondImport.Resource, secondImport.ResourcePath);
@@ -247,6 +259,22 @@ internal sealed class GameAutotestOperation
         }
         catch (Exception ex)
         {
+            if (!binaryParityRecorded)
+            {
+                string binaryOutcome = string.IsNullOrWhiteSpace(exportPath) ? "SKIP" : "FAIL";
+                string binaryDetails = string.IsNullOrWhiteSpace(exportPath)
+                    ? $"Roundtrip failed before binary parity comparison: {ex.Message}"
+                    : $"Binary parity comparison failed: {ex.Message}";
+
+                AddCase(summary, new GameAutotestCaseResult(
+                    game.Name,
+                    caseName,
+                    "binaryparity",
+                    binaryOutcome,
+                    binaryDetails,
+                    TestedResourceType: candidate.ResourceType));
+            }
+
             AddCase(summary, new GameAutotestCaseResult(game.Name, caseName, "roundtrip", "FAIL", ex.Message, candidate.ResourceType));
         }
     }
@@ -747,6 +775,62 @@ internal sealed class GameAutotestOperation
         return string.Join('\n', lines).Trim();
     }
 
+    private static BinaryComparisonResult CompareFilesExactly(string originalPath, string exportedPath)
+    {
+        FileInfo originalInfo = new(originalPath);
+        FileInfo exportedInfo = new(exportedPath);
+
+        if (originalInfo.Length != exportedInfo.Length)
+        {
+            return new BinaryComparisonResult(
+                Matches: false,
+                Details: $"Binary size mismatch. Original={originalInfo.Length} bytes, Exported={exportedInfo.Length} bytes.");
+        }
+
+        using FileStream originalStream = new(originalPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        using FileStream exportedStream = new(exportedPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+
+        const int bufferSize = 81920;
+        byte[] originalBuffer = new byte[bufferSize];
+        byte[] exportedBuffer = new byte[bufferSize];
+        long offset = 0;
+
+        while (true)
+        {
+            int originalRead = originalStream.Read(originalBuffer, 0, originalBuffer.Length);
+            int exportedRead = exportedStream.Read(exportedBuffer, 0, exportedBuffer.Length);
+
+            if (originalRead != exportedRead)
+            {
+                return new BinaryComparisonResult(
+                    Matches: false,
+                    Details: $"Binary read mismatch at offset 0x{offset:X}. OriginalRead={originalRead}, ExportedRead={exportedRead}.");
+            }
+
+            if (originalRead == 0)
+            {
+                break;
+            }
+
+            for (int i = 0; i < originalRead; i++)
+            {
+                if (originalBuffer[i] != exportedBuffer[i])
+                {
+                    long mismatchOffset = offset + i;
+                    return new BinaryComparisonResult(
+                        Matches: false,
+                        Details: $"Binary mismatch at offset 0x{mismatchOffset:X}. Original=0x{originalBuffer[i]:X2}, Exported=0x{exportedBuffer[i]:X2}.");
+                }
+            }
+
+            offset += originalRead;
+        }
+
+        return new BinaryComparisonResult(
+            Matches: true,
+            Details: "Binary files are identical.");
+    }
+
     private static bool IsSkippableTextureOperation(Exception ex)
     {
         return ex.Message.Contains("DDS export is not supported", StringComparison.OrdinalIgnoreCase) ||
@@ -796,6 +880,8 @@ internal sealed class GameAutotestOperation
     private sealed record GameInstall(string Name, string RootPath, Platform Platform);
 
     private sealed record ResourceTestCandidate(string DisplayName, string SourcePath, ResourceType ResourceType);
+
+    private sealed record BinaryComparisonResult(bool Matches, string Details);
 
     private sealed record ProbedBundle(string BundlePath, List<BundleManifestEntry> Entries);
 

@@ -14,7 +14,7 @@ internal class AutotestCommand : ICommand
     public static string CommandToken => "autotest";
     public static string CommandDescription => "Runs automatic tests to ensure the application is working." +
         " When provided a path & format, will import, export, then reimport specified file to ensure IO parity." +
-        " When provided one or more game paths, will probe all bundle-like root files through libbndl and run automated resource operations on supported resource types.";
+        " When provided one or more game paths, will probe all bundle-like root files through libbndl, run automated resource operations on supported resource types, and verify exact binary parity for roundtrip exports.";
     public static string CommandParameters => "[--format=<tub,bpr,x360,ps3>] [--path=<file path>] [--game=<dir>] [--games=<dir1|dir2>] [--bundletool=<file>] [--workdir=<dir>] [--bundlelimit=<n,0=all>] [--resourcelimit=<n>] [--keepartifacts] [--recap=<file|directory>]";
 
     public string? Format { get; set; }
