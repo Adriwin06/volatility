@@ -314,14 +314,49 @@ internal class AutotestCommand : ICommand
     {
         string recapPath = ResolveRecapPath(outputPath);
         StringBuilder builder = new();
+        int binaryParityPassed = summary.Cases.Count(result =>
+            string.Equals(result.Outcome, "PASS", StringComparison.Ordinal) &&
+            string.Equals(result.Operation, "binaryparity", StringComparison.OrdinalIgnoreCase));
+        int semiPassed = Math.Max(0, summary.Passed - binaryParityPassed);
+        DateTime generatedAt = DateTime.Now;
 
         builder.AppendLine("# Volatility Autotest Recap");
         builder.AppendLine();
-        builder.AppendLine($"Generated (UTC): {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}");
-        builder.AppendLine($"Games: {string.Join(" | ", gamePaths)}");
-        builder.AppendLine($"Passed: {summary.Passed}");
-        builder.AppendLine($"Failed: {summary.Failed}");
-        builder.AppendLine($"Skipped: {summary.Skipped}");
+        builder.AppendLine($"Generated ({GetLocalTimeZoneLabel(generatedAt)}): {generatedAt:yyyy-MM-dd HH:mm:ss}");
+        builder.AppendLine($"Games: `{string.Join("` | `", gamePaths)}`");
+        builder.AppendLine($"* Failed: {summary.Failed}");
+        builder.AppendLine($"* Passed with binary parity: {binaryParityPassed}");
+        builder.AppendLine($"* Semi-passed (without binary parity): {semiPassed}");
+        builder.AppendLine($"* Skipped: {summary.Skipped}");
+        builder.AppendLine();
+
+        builder.AppendLine("## Test Operation Summary");
+        builder.AppendLine();
+        
+        List<IGrouping<string, GameAutotestCaseResult>> byOperation = summary.Cases
+            .GroupBy(result => result.Operation, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (byOperation.Count == 0)
+        {
+            builder.AppendLine("No test operations were recorded.");
+        }
+        else
+        {
+            builder.AppendLine("| Operation | Passed | Failed | Skipped |");
+            builder.AppendLine("| --- | ---: | ---: | ---: |");
+
+            foreach (IGrouping<string, GameAutotestCaseResult> group in byOperation)
+            {
+                int passed = group.Count(result => string.Equals(result.Outcome, "PASS", StringComparison.Ordinal));
+                int failed = group.Count(result => string.Equals(result.Outcome, "FAIL", StringComparison.Ordinal));
+                int skipped = group.Count(result => !string.Equals(result.Outcome, "PASS", StringComparison.Ordinal) && !string.Equals(result.Outcome, "FAIL", StringComparison.Ordinal));
+
+                builder.AppendLine($"| {group.Key} | {passed} | {failed} | {skipped} |");
+            }
+        }
+
         builder.AppendLine();
 
         List<IGrouping<ResourceType, GameAutotestCaseResult>> byResourceType = summary.Cases
@@ -391,6 +426,16 @@ internal class AutotestCommand : ICommand
         }
 
         return fullPath;
+    }
+
+    private static string GetLocalTimeZoneLabel(DateTime localTime)
+    {
+        TimeZoneInfo localTimeZone = TimeZoneInfo.Local;
+        TimeSpan offset = localTimeZone.GetUtcOffset(localTime);
+        string sign = offset < TimeSpan.Zero ? "-" : "+";
+        TimeSpan absoluteOffset = offset.Duration();
+
+        return $"UTC{sign}{absoluteOffset:hh\\:mm}";
     }
 
     private static string EscapeMarkdownCell(string value)
