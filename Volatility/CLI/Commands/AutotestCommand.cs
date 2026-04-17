@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text;
 
 using Volatility.Operations.Autotest;
 using Volatility.Resources;
@@ -14,7 +15,7 @@ internal class AutotestCommand : ICommand
     public static string CommandDescription => "Runs automatic tests to ensure the application is working." +
         " When provided a path & format, will import, export, then reimport specified file to ensure IO parity." +
         " When provided one or more game paths, will probe all bundle-like root files through libbndl and run automated resource operations on supported resource types.";
-    public static string CommandParameters => "[--format=<tub,bpr,x360,ps3>] [--path=<file path>] [--game=<dir>] [--games=<dir1|dir2>] [--bundletool=<file>] [--workdir=<dir>] [--bundlelimit=<n,0=all>] [--resourcelimit=<n>] [--keepartifacts]";
+    public static string CommandParameters => "[--format=<tub,bpr,x360,ps3>] [--path=<file path>] [--game=<dir>] [--games=<dir1|dir2>] [--bundletool=<file>] [--workdir=<dir>] [--bundlelimit=<n,0=all>] [--resourcelimit=<n>] [--keepartifacts] [--recap=<file|directory>]";
 
     public string? Format { get; set; }
     public string? Path { get; set; }
@@ -22,6 +23,7 @@ internal class AutotestCommand : ICommand
     public string? GamePaths { get; set; }
     public string? BundleToolPath { get; set; }
     public string? WorkingDirectory { get; set; }
+    public string? RecapPath { get; set; }
     public int BundleLimit { get; set; }
     public int ResourceLimit { get; set; } = 2;
     public bool KeepArtifacts { get; set; }
@@ -44,6 +46,12 @@ internal class AutotestCommand : ICommand
 
             Console.WriteLine(
                 $"AUTOTEST - Completed. Passed={summary.Passed}, Failed={summary.Failed}, Skipped={summary.Skipped}");
+
+            if (!string.IsNullOrWhiteSpace(RecapPath))
+            {
+                string recapFilePath = WriteDetailedRecap(gamePaths, summary, RecapPath);
+                Console.WriteLine($"AUTOTEST - Detailed recap written to: {recapFilePath}");
+            }
             return;
         }
 
@@ -159,6 +167,7 @@ internal class AutotestCommand : ICommand
         GamePaths = args.TryGetValue("games", out object? games) ? games as string : "";
         BundleToolPath = args.TryGetValue("bundletool", out object? bundleTool) ? bundleTool as string : "";
         WorkingDirectory = args.TryGetValue("workdir", out object? workdir) ? workdir as string : "";
+        RecapPath = args.TryGetValue("recap", out object? recap) ? recap as string : "";
         KeepArtifacts = args.TryGetValue("keepartifacts", out var keepArtifacts) && (bool)keepArtifacts;
 
         if (args.TryGetValue("bundlelimit", out object? bundleLimitValue) &&
@@ -299,6 +308,99 @@ internal class AutotestCommand : ICommand
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static string WriteDetailedRecap(IReadOnlyList<string> gamePaths, GameAutotestSummary summary, string outputPath)
+    {
+        string recapPath = ResolveRecapPath(outputPath);
+        StringBuilder builder = new();
+
+        builder.AppendLine("# Volatility Autotest Recap");
+        builder.AppendLine();
+        builder.AppendLine($"Generated (UTC): {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}");
+        builder.AppendLine($"Games: {string.Join(" | ", gamePaths)}");
+        builder.AppendLine($"Passed: {summary.Passed}");
+        builder.AppendLine($"Failed: {summary.Failed}");
+        builder.AppendLine($"Skipped: {summary.Skipped}");
+        builder.AppendLine();
+
+        List<IGrouping<ResourceType, GameAutotestCaseResult>> byResourceType = summary.Cases
+            .Where(result => result.TestedResourceType.HasValue)
+            .GroupBy(result => result.TestedResourceType!.Value)
+            .OrderBy(group => group.Key.ToString(), StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        builder.AppendLine("## Resource Type Outcomes");
+        builder.AppendLine();
+
+        if (byResourceType.Count == 0)
+        {
+            builder.AppendLine("No resource-type specific cases were recorded.");
+        }
+        else
+        {
+            builder.AppendLine("| Resource Type | Passed | Failed | Skipped | Overall |");
+            builder.AppendLine("| --- | ---: | ---: | ---: | --- |");
+
+            foreach (IGrouping<ResourceType, GameAutotestCaseResult> group in byResourceType)
+            {
+                int passed = group.Count(result => string.Equals(result.Outcome, "PASS", StringComparison.Ordinal));
+                int failed = group.Count(result => string.Equals(result.Outcome, "FAIL", StringComparison.Ordinal));
+                int skipped = group.Count(result => !string.Equals(result.Outcome, "PASS", StringComparison.Ordinal) && !string.Equals(result.Outcome, "FAIL", StringComparison.Ordinal));
+                string overall = failed > 0 ? "FAIL" : passed > 0 ? "PASS" : "SKIP";
+
+                builder.AppendLine($"| {group.Key} | {passed} | {failed} | {skipped} | {overall} |");
+            }
+        }
+
+        builder.AppendLine();
+        builder.AppendLine("## Case Details");
+        builder.AppendLine();
+        builder.AppendLine("| Game | Resource Type | Operation | Name | Outcome | Details |");
+        builder.AppendLine("| --- | --- | --- | --- | --- | --- |");
+
+        foreach (GameAutotestCaseResult result in summary.Cases)
+        {
+            string resourceType = result.TestedResourceType?.ToString() ?? "-";
+            builder.AppendLine($"| {EscapeMarkdownCell(result.Game)} | {EscapeMarkdownCell(resourceType)} | {EscapeMarkdownCell(result.Operation)} | {EscapeMarkdownCell(result.Name)} | {EscapeMarkdownCell(result.Outcome)} | {EscapeMarkdownCell(result.Details ?? string.Empty)} |");
+        }
+
+        File.WriteAllText(recapPath, builder.ToString());
+        return recapPath;
+    }
+
+    private static string ResolveRecapPath(string outputPath)
+    {
+        string fullPath = System.IO.Path.GetFullPath(outputPath);
+        bool looksLikeDirectory =
+            outputPath.EndsWith(System.IO.Path.DirectorySeparatorChar) ||
+            outputPath.EndsWith(System.IO.Path.AltDirectorySeparatorChar) ||
+            string.IsNullOrWhiteSpace(System.IO.Path.GetExtension(fullPath));
+
+        if (Directory.Exists(fullPath) || looksLikeDirectory)
+        {
+            Directory.CreateDirectory(fullPath);
+            string timestamp = DateTime.UtcNow.ToString("yyyyMMdd_HHmmss");
+            return System.IO.Path.Combine(fullPath, $"autotest_recap_{timestamp}.md");
+        }
+
+        string? directory = System.IO.Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        return fullPath;
+    }
+
+    private static string EscapeMarkdownCell(string value)
+    {
+        return value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("|", "\\|", StringComparison.Ordinal)
+            .Replace("\r", " ", StringComparison.Ordinal)
+            .Replace("\n", "<br>", StringComparison.Ordinal)
+            .Trim();
     }
 
     public AutotestCommand() { }

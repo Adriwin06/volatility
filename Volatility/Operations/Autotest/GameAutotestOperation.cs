@@ -29,7 +29,8 @@ internal sealed record GameAutotestCaseResult(
     string Name,
     string Operation,
     string Outcome,
-    string? Details = null);
+    string? Details = null,
+    ResourceType? TestedResourceType = null);
 
 internal sealed class GameAutotestOperation
 {
@@ -232,7 +233,7 @@ internal sealed class GameAutotestOperation
 
             if (string.Equals(firstYaml, secondYaml, StringComparison.Ordinal))
             {
-                AddCase(summary, new GameAutotestCaseResult(game.Name, caseName, "roundtrip", "PASS"));
+                AddCase(summary, new GameAutotestCaseResult(game.Name, caseName, "roundtrip", "PASS", TestedResourceType: candidate.ResourceType));
                 return;
             }
 
@@ -241,11 +242,12 @@ internal sealed class GameAutotestOperation
                 caseName,
                 "roundtrip",
                 "FAIL",
-                $"YAML mismatch after reimport. Pass1={firstImport.ResourcePath}, Pass2={secondImport.ResourcePath}"));
+                $"YAML mismatch after reimport. Pass1={firstImport.ResourcePath}, Pass2={secondImport.ResourcePath}",
+                TestedResourceType: candidate.ResourceType));
         }
         catch (Exception ex)
         {
-            AddCase(summary, new GameAutotestCaseResult(game.Name, caseName, "roundtrip", "FAIL", ex.Message));
+            AddCase(summary, new GameAutotestCaseResult(game.Name, caseName, "roundtrip", "FAIL", ex.Message, candidate.ResourceType));
         }
     }
 
@@ -262,11 +264,11 @@ internal sealed class GameAutotestOperation
         {
             ImportResourceResult importResult = await importOperation.ExecuteAsync(candidate.ResourceType, game.Platform, candidate.SourcePath, isX64: false);
             await saveOperation.ExecuteAsync(importResult.Resource, importResult.ResourcePath);
-            AddCase(summary, new GameAutotestCaseResult(game.Name, caseName, "import", "PASS"));
+            AddCase(summary, new GameAutotestCaseResult(game.Name, caseName, "import", "PASS", TestedResourceType: candidate.ResourceType));
         }
         catch (Exception ex)
         {
-            AddCase(summary, new GameAutotestCaseResult(game.Name, caseName, "import", "FAIL", ex.Message));
+            AddCase(summary, new GameAutotestCaseResult(game.Name, caseName, "import", "FAIL", ex.Message, candidate.ResourceType));
         }
     }
 
@@ -283,18 +285,18 @@ internal sealed class GameAutotestOperation
         try
         {
             await textureToDdsOperation.ExecuteAsync([candidate.SourcePath], game.Platform, isX64: false, ddsRoot, overwrite: true, verbose: false);
-            AddCase(summary, new GameAutotestCaseResult(game.Name, ddsCaseName, "texturetodds", "PASS"));
+            AddCase(summary, new GameAutotestCaseResult(game.Name, ddsCaseName, "texturetodds", "PASS", TestedResourceType: ResourceType.Texture));
         }
         catch (Exception ex)
         {
             string outcome = IsSkippableTextureOperation(ex) ? "SKIP" : "FAIL";
-            AddCase(summary, new GameAutotestCaseResult(game.Name, ddsCaseName, "texturetodds", outcome, ex.Message));
+            AddCase(summary, new GameAutotestCaseResult(game.Name, ddsCaseName, "texturetodds", outcome, ex.Message, ResourceType.Texture));
         }
 
         Platform destinationPlatform = GetTexturePortDestination(game.Platform);
         if (destinationPlatform == Platform.Agnostic)
         {
-            AddCase(summary, new GameAutotestCaseResult(game.Name, $"{candidate.DisplayName}:port", "porttexture", "SKIP", "No supported destination platform."));
+            AddCase(summary, new GameAutotestCaseResult(game.Name, $"{candidate.DisplayName}:port", "porttexture", "SKIP", "No supported destination platform.", ResourceType.Texture));
             return;
         }
 
@@ -315,11 +317,11 @@ internal sealed class GameAutotestOperation
                 verbose: false,
                 useGtf: false);
 
-            AddCase(summary, new GameAutotestCaseResult(game.Name, portCaseName, "porttexture", "PASS"));
+            AddCase(summary, new GameAutotestCaseResult(game.Name, portCaseName, "porttexture", "PASS", TestedResourceType: ResourceType.Texture));
         }
         catch (Exception ex)
         {
-            AddCase(summary, new GameAutotestCaseResult(game.Name, portCaseName, "porttexture", "FAIL", ex.Message));
+            AddCase(summary, new GameAutotestCaseResult(game.Name, portCaseName, "porttexture", "FAIL", ex.Message, ResourceType.Texture));
         }
     }
 
@@ -381,7 +383,8 @@ internal sealed class GameAutotestOperation
                         GetResourceTypeLabel(unsupportedType),
                         "unsupported",
                         "SKIP",
-                        $"Discovered in {bundleName}. No Volatility autotest handler exists for this resource type."));
+                        $"Discovered in {bundleName}. No Volatility autotest handler exists for this resource type.",
+                        TestedResourceType: unsupportedType));
                 }
             }
 
@@ -488,7 +491,8 @@ internal sealed class GameAutotestOperation
                         $"{selectedEntry.ResourceType}:{selectedEntry.DisplayName}",
                         "candidate",
                         "FAIL",
-                        $"Failed to resolve extracted primary data from {bundleName}."));
+                        $"Failed to resolve extracted primary data from {bundleName}.",
+                        TestedResourceType: selectedEntry.ResourceType));
                     continue;
                 }
 
@@ -504,7 +508,8 @@ internal sealed class GameAutotestOperation
                 GetResourceTypeLabel(blockedType),
                 "candidate",
                 "SKIP",
-                "No fully extractable bundle candidate was available for this supported resource type."));
+                "No fully extractable bundle candidate was available for this supported resource type.",
+                TestedResourceType: blockedType));
         }
 
         return candidates;
