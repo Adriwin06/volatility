@@ -10,6 +10,7 @@ Download and extract the latest version of the application from the [Releases pa
 Ensure you have the necessary prerequisites to develop .NET 9.0 applications on your machine.
 
 After cloning, initialize the extractor submodule with `git submodule update --init --recursive`.
+This must stay recursive because `tools/libbndl-extractor` itself pins `Bo98/libbndl` as a nested submodule.
 
 Compiling the application is as simple as opening the project within your IDE of choice (Such as Rider or Visual Studio 2022), or by running `dotnet build`.
 
