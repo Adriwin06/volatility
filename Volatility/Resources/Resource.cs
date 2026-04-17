@@ -19,7 +19,7 @@ public abstract class Resource
     [EditorCategory("Import Data"), EditorLabel("Unpacker"), EditorTooltip("The tool used to extract this resource from a bundle.")]
     public Unpacker Unpacker = Unpacker.Raw;
 
-    public virtual ResourceType ResourceType => ResourceType.Invalid;
+    public ResourceType ResourceType => ResourceMetadata.GetResourceType(GetType());
     public virtual Endian ResourceEndian => Endian.Agnostic;   // Forced endianness for platform-specific resources (e.g. Textures)
     public virtual Platform ResourcePlatform => Platform.Agnostic;
     public virtual Arch ResourceArch => Arch;

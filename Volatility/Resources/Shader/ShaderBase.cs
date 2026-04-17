@@ -2,7 +2,7 @@
 
 [ResourceDefinition(ResourceType.Shader)]
 [ResourceRegistration(RegistrationPlatforms.Agnostic)]
-public class ShaderBase : TypedResource
+public class ShaderBase : Resource
 {
     [EditorCategory("Shader/Source"), EditorLabel("Source File"), EditorTooltip("Relative path to the HLSL source file.")]
     public string? ShaderSourcePath { get; set; }

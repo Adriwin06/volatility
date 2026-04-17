@@ -4,7 +4,7 @@ namespace Volatility.Resources;
 
 [ResourceDefinition(ResourceType.EnvironmentTimeLine)]
 [ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
-public class EnvironmentTimeline : TypedResource
+public class EnvironmentTimeline : Resource
 {
     private const int HeaderSize = 0x10;
     private const int SectionAlignment = 0x10;

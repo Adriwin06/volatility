@@ -11,7 +11,7 @@ namespace Volatility.Resources;
 
 [ResourceDefinition(ResourceType.Model)]
 [ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
-public class Model : TypedResource
+public class Model : Resource
 {
     private const int HeaderSize = 0x14;
     private const int RenderableOffsetSize = sizeof(uint);

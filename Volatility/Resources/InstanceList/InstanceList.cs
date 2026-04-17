@@ -13,7 +13,7 @@ namespace Volatility.Resources;
 
 [ResourceDefinition(ResourceType.InstanceList)]
 [ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
-public class InstanceList : TypedResource
+public class InstanceList : Resource
 {
     private const int HeaderSize = 0x10;
     private const int SectionAlignment = 0x10;

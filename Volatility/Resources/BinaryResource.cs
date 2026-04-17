@@ -9,7 +9,7 @@ namespace Volatility.Resources;
 
 [ResourceDefinition(ResourceType.BinaryFile)]
 [ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
-public class BinaryResource : TypedResource
+public class BinaryResource : Resource
 {
     public uint DataSize { get; set; }
     public uint DataOffset { get; set; }
@@ -21,35 +21,13 @@ public class BinaryResource : TypedResource
         DataOffset = dataOffset == 0 ? 0x10u : dataOffset;
     }
 
-    protected BinaryResource(ResourceType resourceType, uint dataOffset, uint dataSize)
-        : base(resourceType)
-    {
-        DataSize = dataSize;
-        DataOffset = dataOffset == 0 ? 0x10u : dataOffset;
-    }
-
     public BinaryResource() : base()
-    {
-        DataOffset = 0x10;
-    }
-
-    protected BinaryResource(ResourceType resourceType)
-        : base(resourceType)
     {
         DataOffset = 0x10;
     }
 
     public BinaryResource(string path, Endian endianness = Endian.Agnostic)
         : base(path, endianness)
-    {
-        if (DataOffset == 0)
-        {
-            DataOffset = 0x10;
-        }
-    }
-
-    protected BinaryResource(ResourceType resourceType, string path, Endian endianness = Endian.Agnostic)
-        : base(resourceType, path, endianness)
     {
         if (DataOffset == 0)
         {

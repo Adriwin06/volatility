@@ -4,7 +4,7 @@ namespace Volatility.Resources;
 
 [ResourceDefinition(ResourceType.AptData)]
 [ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
-public class AptData : TypedResource
+public class AptData : Resource
 {
     public string MovieName;
     public string BaseComponentName;

@@ -11,7 +11,7 @@ namespace Volatility.Resources;
 
 [ResourceDefinition(ResourceType.AttribSysVault)]
 [ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
-public class AttribSysVault : TypedResource
+public class AttribSysVault : Resource
 {
     public ulong VltDataOffset { get; set; }
     public uint VltSizeInBytes { get; set; }

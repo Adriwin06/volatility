@@ -314,7 +314,7 @@ public struct GlassPaneSpec
 
 [ResourceDefinition(ResourceType.StreamedDeformationSpec)]
 [ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
-public class StreamedDeformationSpec : TypedResource
+public class StreamedDeformationSpec : Resource
 {
     public const int HeaderSize32 = 0x6B0;
     public const int HeaderSize64 = 0x6F0;

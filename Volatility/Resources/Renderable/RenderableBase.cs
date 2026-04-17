@@ -12,7 +12,7 @@ namespace Volatility.Resources;
 // https://burnout.wiki/wiki/Renderable
 
 [ResourceDefinition(ResourceType.Renderable)]
-public abstract class RenderableBase : TypedResource
+public abstract class RenderableBase : Resource
 {
     public Vector3Plus BoundingSphere;
     public ushort Version;

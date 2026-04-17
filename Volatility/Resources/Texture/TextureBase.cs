@@ -9,7 +9,7 @@
 // https://burnout.wiki/wiki/Texture
 
 [ResourceDefinition(ResourceType.Texture)]
-public abstract class TextureBase : TypedResource
+public abstract class TextureBase : Resource
 {
     [EditorCategory("Texture"), EditorLabel("Width"), EditorTooltip("The target width of the texture.")]
     public ushort Width { get; set; }

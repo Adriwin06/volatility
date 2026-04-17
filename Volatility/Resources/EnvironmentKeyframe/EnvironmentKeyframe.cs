@@ -9,7 +9,7 @@ namespace Volatility.Resources;
 
 [ResourceDefinition(ResourceType.EnvironmentKeyframe)]
 [ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
-public class EnvironmentKeyframe : TypedResource 
+public class EnvironmentKeyframe : Resource 
 {
     public BloomData BloomSettings;
     public VignetteData VignetteSettings;

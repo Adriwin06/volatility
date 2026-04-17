@@ -4,7 +4,7 @@ namespace Volatility.Resources;
 
 [ResourceDefinition(ResourceType.GuiPopup)]
 [ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
-public class GuiPopup : TypedResource
+public class GuiPopup : Resource
 {
     private const int HeaderSize = 0x40;
     private const int PopupStructSize = 0xC0;
