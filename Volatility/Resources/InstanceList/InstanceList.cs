@@ -15,7 +15,6 @@ namespace Volatility.Resources;
 [ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
 public class InstanceList : Resource
 {
-    private const int HeaderSize = 0x10;
     private const int SectionAlignment = 0x10;
 
     [EditorLabel("Number of instances"), EditorCategory("Instance List"), EditorReadOnly, EditorTooltip("The amount of instances that have a model assigned, but NOT the size of the entire instance array.")]
@@ -26,8 +25,7 @@ public class InstanceList : Resource
 
     public InstanceList() : base() { }
 
-    public InstanceList(string path, Endian endianness = Endian.Agnostic)
-        : base(path, endianness) { }
+    public InstanceList(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 
     public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness = Endian.Agnostic)
     {
@@ -35,14 +33,19 @@ public class InstanceList : Resource
 
         int instanceBlockSize = GetInstanceBlockSize(ResourceArch);
         uint entryCount = (uint)Instances.Count;
+        if (NumInstances > entryCount)
+        {
+            throw new InvalidDataException(
+                $"NumInstances ({NumInstances}) cannot exceed the total array size ({entryCount}).");
+        }
 
-        long currentOffset = HeaderSize;
+        long currentOffset = GetHeaderSize(ResourceArch);
         long instanceListOffset = ResourceUtilities.GetSectionOffset(
             ref currentOffset,
             checked((int)(entryCount * instanceBlockSize)),
             SectionAlignment);
 
-        writer.Write((int)instanceListOffset);
+        writer.WritePointer((ulong)instanceListOffset, ResourceArch);
         writer.Write(entryCount);
         writer.Write(NumInstances);
         writer.Write(1u);
@@ -54,23 +57,48 @@ public class InstanceList : Resource
     {
         base.ParseFromStream(reader, endianness);
 
-        long instanceListPtr = reader.ReadInt32();
+        ulong instanceListPtr = reader.ReadPointer(ResourceArch);
         uint entries = reader.ReadUInt32();
         NumInstances = reader.ReadUInt32();
 
-        if (reader.ReadUInt32() != 1)
+        uint version = reader.ReadUInt32();
+        if (version != 1)
         {
-            throw new InvalidDataException("Version mismatch!");
+            throw new InvalidDataException($"Version mismatch! Version should be 1. (Found version {version})");
         }
 
         Instances.Clear();
 
         long instanceBlockSize = GetInstanceBlockSize(ResourceArch);
-        long importBlockOffset = instanceListPtr + (instanceBlockSize * entries);
+        if (entries > 0 && instanceListPtr == 0)
+        {
+            throw new InvalidDataException("Instance list pointer is null, but the resource declares instance entries.");
+        }
+
+        if (NumInstances > entries)
+        {
+            throw new InvalidDataException(
+                $"Invalid InstanceList header: NumInstances ({NumInstances}) cannot exceed array size ({entries}).");
+        }
+
+        if (instanceListPtr != 0 && instanceListPtr < (ulong)GetHeaderSize(ResourceArch))
+        {
+            throw new InvalidDataException(
+                $"Invalid InstanceList pointer 0x{instanceListPtr:X}. Instance data overlaps the resource header.");
+        }
+
+        long instanceDataLength = checked(instanceBlockSize * (long)entries);
+        if (instanceListPtr != 0 && ((long)instanceListPtr + instanceDataLength) > reader.BaseStream.Length)
+        {
+            throw new InvalidDataException(
+                $"Instance data range 0x{instanceListPtr:X}-0x{((long)instanceListPtr + instanceDataLength):X} exceeds stream length 0x{reader.BaseStream.Length:X}.");
+        }
+
+        long importBlockOffset = (long)instanceListPtr + instanceDataLength;
 
         for (int i = 0; i < entries; i++)
         {
-            long instanceOffset = instanceListPtr + (instanceBlockSize * i);
+            long instanceOffset = (long)instanceListPtr + (instanceBlockSize * i);
 
             reader.ParseSection(instanceOffset, r => ReadInstance(r, ResourceArch, importBlockOffset), out Instance instance);
             Instances.Add(instance);
@@ -80,6 +108,11 @@ public class InstanceList : Resource
     private static int GetInstanceBlockSize(Arch arch)
     {
         return arch == Arch.x64 ? 0x60 : 0x50;
+    }
+
+    private static int GetHeaderSize(Arch arch)
+    {
+        return ResourceUtilities.GetPointerSize(arch) + (sizeof(uint) * 3);
     }
 
     private static Instance ReadInstance(
@@ -93,9 +126,13 @@ public class InstanceList : Resource
         reader.BaseStream.Seek(blockStart + ResourceUtilities.GetPointerSize(arch), SeekOrigin.Begin);
 
         short backdropZoneId = reader.ReadInt16();
-        reader.BaseStream.Seek(0x2, SeekOrigin.Current);
+        reader.BaseStream.Seek(0x6, SeekOrigin.Current);
         float maxVisibleDistanceSquared = reader.ReadSingle();
-        reader.BaseStream.Seek(0x4, SeekOrigin.Current);
+        if (arch == Arch.x64)
+        {
+            reader.BaseStream.Seek(0xC, SeekOrigin.Current);
+        }
+
         Matrix44Affine transformMatrix = ReadMatrix44Affine(reader);
         Transform transform = Matrix44AffineToTransform(transformMatrix);
 
@@ -115,9 +152,12 @@ public class InstanceList : Resource
 
         writer.WritePointer(0, arch);
         writer.Write(instance.BackdropZoneID);
-        writer.Write(new byte[0x2]);
+        writer.WriteFixedBytes(null, 0x6);
         writer.Write(instance.MaxVisibleDistanceSquared);
-        writer.Write(new byte[0x4]);
+        if (arch == Arch.x64)
+        {
+            writer.WriteFixedBytes(null, 0xC);
+        }
 
         Matrix44Affine transformMatrix = instance.TransformMatrix != default
             ? instance.TransformMatrix
@@ -140,6 +180,7 @@ public class InstanceList : Resource
     public override IEnumerable<KeyValuePair<long, ResourceImport>> GetExternalImports()
     {
         int instanceBlockSize = GetInstanceBlockSize(ResourceArch);
+        long instanceListOffset = ResourceUtilities.AlignOffset(GetHeaderSize(ResourceArch), SectionAlignment);
         for (int i = 0; i < Instances.Count; i++)
         {
             ResourceImport modelReference = Instances[i].ModelReference;
@@ -149,7 +190,7 @@ public class InstanceList : Resource
             }
 
             yield return new KeyValuePair<long, ResourceImport>(
-                HeaderSize + (i * instanceBlockSize),
+                instanceListOffset + (i * instanceBlockSize),
                 modelReference);
         }
     }
@@ -157,8 +198,8 @@ public class InstanceList : Resource
 
 public struct Instance
 {
-    [EditorLabel("Resource ID"), EditorCategory("InstanceList/Instances"), EditorTooltip("The reference to the resource placed by this instance.")]
-    public ResourceImport ResourceId;
+    [EditorLabel("Model Reference"), EditorCategory("InstanceList/Instances"), EditorTooltip("The external model import referenced by this instance.")]
+    public ResourceImport ModelReference;
 
     [EditorLabel("Transform"), EditorCategory("InstanceList/Instances"), EditorTooltip("The location, rotation, and scale of this instance.")]
     public Transform Transform;
@@ -169,9 +210,6 @@ public struct Instance
     [EditorLabel("Transform"), EditorCategory("InstanceList/Instances"), EditorTooltip("If this is a backdrop, the PVS Zone ID that this backdrop represents.")]
     public short BackdropZoneID;
 
-    [EditorLabel("Max Visible Distance Squared"), EditorCategory("InstanceList/Instances"), EditorTooltip("The maximum distance that this instance can be seen (in meters), squared.")]
-    public float MaxVisibleDistanceSquared;
-
     [EditorHidden]
-    public ResourceImport ModelReference;
+    public float MaxVisibleDistanceSquared;
 }
