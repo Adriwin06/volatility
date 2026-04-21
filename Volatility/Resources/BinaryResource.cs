@@ -14,8 +14,7 @@ public class BinaryResource : Resource
     public uint DataSize { get; set; }
     public uint DataOffset { get; set; }
 
-    public BinaryResource(uint dataOffset, uint dataSize)
-        : this()
+    public BinaryResource(uint dataOffset, uint dataSize) : this()
     {
         DataSize = dataSize;
         DataOffset = dataOffset == 0 ? 0x10u : dataOffset;
@@ -26,8 +25,7 @@ public class BinaryResource : Resource
         DataOffset = 0x10;
     }
 
-    public BinaryResource(string path, Endian endianness = Endian.Agnostic)
-        : base(path, endianness)
+    public BinaryResource(string path, Endian endianness = Endian.Agnostic) : base(path, endianness)
     {
         if (DataOffset == 0)
         {
