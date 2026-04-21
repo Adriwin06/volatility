@@ -41,7 +41,7 @@ internal class ExportResourceOperation
             outputPath,
             writer,
             endian,
-            ResolveImportExportUnpacker(resource, importUnpackerOverride),
+            ResolveExternalImportsUnpackerFormat(resource, importUnpackerOverride),
             writeImportsToSeparateFile);
 
         if (resource is ShaderBase shader)
@@ -82,7 +82,7 @@ internal class ExportResourceOperation
         return Task.CompletedTask;
     }
 
-    private static Unpacker ResolveImportExportUnpacker(
+    private static Unpacker ResolveExternalImportsUnpackerFormat(
         Resource resource,
         Unpacker? importUnpackerOverride)
     {
@@ -163,9 +163,10 @@ internal class ExportResourceOperation
                     $"Import offset 0x{entry.Key:X} cannot be stored in a binary imports block.");
             }
 
-            writer.Write(ResourceUtilities.ResolveResourceID(entry.Value));
+            // Probably overkill but I just want to make sure we always use the correct writer overloads
+            writer.Write((ulong)ResourceUtilities.ResolveResourceID(entry.Value));
             writer.Write((uint)entry.Key);
-            writer.Write(0u);
+            writer.Write(0x00000000);
         }
     }
 
