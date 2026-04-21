@@ -24,6 +24,7 @@ public abstract class Resource
     public virtual Platform ResourcePlatform => Platform.Agnostic;
     public virtual Arch ResourceArch => Arch;
     public virtual void SetResourceArch(Arch newArch) { Arch = newArch; }
+    public virtual IEnumerable<KeyValuePair<long, ResourceImport>> GetExternalImports() { yield break; }
 
     public virtual void WriteToStream(ResourceBinaryWriter writer, Endian endianness = Endian.Agnostic) 
     { 

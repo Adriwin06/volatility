@@ -144,7 +144,7 @@ public class Model : Resource
         return modelData;
     }
 
-    public IEnumerable<KeyValuePair<long, ResourceImport>> GetExternalImports()
+    public override IEnumerable<KeyValuePair<long, ResourceImport>> GetExternalImports()
     {
         int renderablePointerSize = ResourceUtilities.GetPointerSize(ResourceArch);
         long renderablesOffset = GetHeaderSize(ResourceArch);

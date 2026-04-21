@@ -137,7 +137,7 @@ public class InstanceList : Resource
         }
     }
 
-    public IEnumerable<KeyValuePair<long, ResourceImport>> GetExternalImports()
+    public override IEnumerable<KeyValuePair<long, ResourceImport>> GetExternalImports()
     {
         int instanceBlockSize = GetInstanceBlockSize(ResourceArch);
         for (int i = 0; i < Instances.Count; i++)
