@@ -26,7 +26,6 @@ public class TexturePC : TextureBase
     public byte Unknown1;                       // Flags
     public byte Unknown2;                       // Flags
     private byte[] OutputFormat = new byte[4];  // Needs to be 4 bytes long
-    public byte[] PreservedHeader = [];
     public TEXTURETYPE TextureType;             // Dimension in BPR
     public byte Flags;                          // Flags
 
@@ -37,17 +36,6 @@ public class TexturePC : TextureBase
     public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness = Endian.Agnostic)
     {
         base.WriteToStream(writer, endianness);
-
-        if (PreservedHeader.Length == 0x40 &&
-            Width == 0 &&
-            Height == 0 &&
-            Depth == 0 &&
-            MipmapLevels == 0 &&
-            Format == D3DFORMAT.D3DFMT_UNKNOWN)
-        {
-            writer.Write(PreservedHeader);
-            return;
-        }
 
         PushAll(); // Need to determine if should be moved
 
@@ -74,14 +62,6 @@ public class TexturePC : TextureBase
     public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness = Endian.Agnostic)
     {
         base.ParseFromStream(reader, endianness);
-
-        if (reader.BaseStream.Length == 0x40)
-        {
-            long originalPosition = reader.BaseStream.Position;
-            reader.BaseStream.Seek(0, SeekOrigin.Begin);
-            PreservedHeader = reader.ReadBytes(0x40);
-            reader.BaseStream.Seek(originalPosition, SeekOrigin.Begin);
-        }
 
         reader.BaseStream.Seek(8, SeekOrigin.Begin);    // Skip over Data & Interface pointers
         Unknown0 = reader.ReadUInt32();

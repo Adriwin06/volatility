@@ -27,7 +27,8 @@ public class SnapshotData : BinaryResource
 
         writer.Write(snapshotCount);
         writer.Write(Channels.Count);
-        writer.Write(0UL);
+        writer.Write(1);            // maiPad[0] (mixer state?)
+        writer.Write(0x12345678);   // maiPad[1]
         writer.WriteSection(channelsOffset, Channels, SnapshotChannelData.Write);
         writer.WriteSection(statusesOffset, SnapshotStatuses, SnapshotStatusData.Write);
     }
@@ -49,8 +50,7 @@ public class SnapshotData : BinaryResource
 
     public SnapshotData() : base() { }
 
-    public SnapshotData(string path, Endian endianness = Endian.Agnostic)
-        : base(path, endianness) { }
+    public SnapshotData(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 
     private int GetSnapshotCountForWrite()
     {

@@ -75,8 +75,7 @@ public class AttribSysVault : Resource
         PtrN = [];
         Data = string.Empty;
 
-        Arch arch = ResourceArch;
-        if (arch == Arch.x64)
+        if (ResourceArch == Arch.x64)
         {
             VltDataOffset = reader.ReadUInt64();
             VltSizeInBytes = reader.ReadUInt32();

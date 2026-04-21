@@ -20,8 +20,7 @@ public class EnvironmentKeyframe : Resource
 
     public EnvironmentKeyframe() : base() { }
 
-    public EnvironmentKeyframe(string path, Endian endianness = Endian.Agnostic)
-        : base(path, endianness) { } 
+    public EnvironmentKeyframe(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { } 
 
     public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness = Endian.Agnostic)
     {

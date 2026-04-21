@@ -8,6 +8,8 @@ namespace Volatility.Resources;
 
 public struct ResourceImport
 {
+    public const int ImportEntrySize = 0x10;
+
     // The idea here is that if the name is populated but
     // the ID is empty, the name will be calculated into an ID
     // on export. If both a name and ID exist, use the ID, as
@@ -45,9 +47,9 @@ public struct ResourceImport
         long originalPosition = reader.BaseStream.Position;
 
         // In-resource imports block
-        if (reader.BaseStream.Length >= importBlockOffset + (0x10 * index) + 0x10)
+        if (reader.BaseStream.Length >= importBlockOffset + ((long)ImportEntrySize * index) + ImportEntrySize)
         {
-            reader.BaseStream.Seek(importBlockOffset + (0x10 * index), SeekOrigin.Begin);
+            reader.BaseStream.Seek(importBlockOffset + ((long)ImportEntrySize * index), SeekOrigin.Begin);
 
             resourceImport = new ResourceImport(reader.ReadUInt64(), externalImport: true);
             
@@ -81,7 +83,7 @@ public struct ResourceImport
         reader.BaseStream.Seek(importBlockOffset, SeekOrigin.Begin);
         
         // In-resource imports block
-        while (reader.BaseStream.Position + 0x10 <= reader.BaseStream.Length)
+        while (reader.BaseStream.Position + ImportEntrySize <= reader.BaseStream.Length)
         {
             ulong resourceValue = reader.ReadUInt64();
             long entryKey = reader.ReadUInt32();

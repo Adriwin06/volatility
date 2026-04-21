@@ -10,6 +10,10 @@ public class AptData : Resource
     public string BaseComponentName;
     public GuiGeometryObject GuiGeometry;
 
+    public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness = Endian.Agnostic)
+    {
+        base.WriteToStream(writer);
+    }
     public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness = Endian.Agnostic)
     {
         base.ParseFromStream(reader, endianness);
@@ -100,8 +104,7 @@ public class AptData : Resource
 
     public AptData() : base() { }
 
-    public AptData(string path, Endian endianness = Endian.Agnostic)
-        : base(path, endianness) { }
+    public AptData(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 }
 
 public struct GuiGeometryObject

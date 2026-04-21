@@ -6,11 +6,9 @@ namespace Volatility.Resources;
 [ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
 public class EnvironmentTimeline : Resource
 {
-    private const int HeaderSize = 0x10;
     private const int SectionAlignment = 0x10;
     private const int KeyframeTimeSize = sizeof(float);
     private const int KeyframeReferencePlaceholderSize = sizeof(uint);
-    private const int ImportEntrySize = 0x10;
 
     public LocationData[] Locations = [];
 
@@ -18,15 +16,13 @@ public class EnvironmentTimeline : Resource
     {
         base.WriteToStream(writer, endianness);
 
-        Arch arch = ResourceArch;
         LocationData[] locations = Locations ?? [];
-        int locationStructSize = GetLocationStructSize(arch);
 
-        long currentOffset = HeaderSize;
+        long currentOffset = 0x10;  // Header size
         ulong locationsOffset = ResourceUtilities.GetSectionOffset(
             ref currentOffset,
             locations.Length,
-            locationStructSize,
+            GetLocationStructSize(ResourceArch),
             SectionAlignment);
 
         ulong[] keyframeTimesOffsets = new ulong[locations.Length];
@@ -54,16 +50,16 @@ public class EnvironmentTimeline : Resource
 
         long importsOffset = ResourceUtilities.GetSectionOffset(
             ref currentOffset,
-            totalImports * ImportEntrySize,
+            totalImports * ResourceImport.ImportEntrySize,
             SectionAlignment);
 
-        writer.Write(0x1);
+        writer.Write(0x1);                      // Version
         writer.Write(locations.Length);
-        writer.Write((uint)locationsOffset);
-        writer.Write(0x0);
+        writer.Write((uint)locationsOffset);    // Locations Pointer
+        writer.Write(0x0);                      // Padding
 
         writer.WriteSection(locationsOffset, locations, (w, location, index) =>
-            WriteLocationHeader(w, location, arch, keyframeTimesOffsets[index], keyframeRefsOffsets[index]));
+            WriteLocationHeader(w, location, ResourceArch, keyframeTimesOffsets[index], keyframeRefsOffsets[index]));
 
         for (int i = 0; i < locations.Length; i++)
         {
@@ -93,8 +89,6 @@ public class EnvironmentTimeline : Resource
     {
         base.ParseFromStream(reader, endianness);
 
-        Arch arch = ResourceArch;
-
         int version = reader.ReadInt32();
         if (version != 1)
         {
@@ -102,16 +96,15 @@ public class EnvironmentTimeline : Resource
         }
 
         int locationCount = reader.ReadInt32();
-        uint locationsPtr = reader.ReadUInt32();
-        reader.BaseStream.Seek(0x4, SeekOrigin.Current);
+        ulong locationsPtr = reader.ReadPointer(ResourceArch);
+        reader.BaseStream.Seek(0x10, SeekOrigin.Begin);
 
-        Locations = reader.ParseSection((long)locationsPtr, locationCount, r => ReadLocation(r, arch)).ToArray();
+        Locations = reader.ParseSection(locationsPtr, locationCount, r => ReadLocation(r, ResourceArch)).ToArray();
     }
 
     public EnvironmentTimeline() : base() { }
 
-    public EnvironmentTimeline(string path, Endian endianness = Endian.Agnostic)
-        : base(path, endianness) { }
+    public EnvironmentTimeline(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 
     private static int GetLocationStructSize(Arch arch)
     {

@@ -27,6 +27,15 @@ public class ShaderBase : Resource
     [EditorCategory("Shader/Compile"), EditorLabel("Additional Arguments"), EditorTooltip("Extra dxc command-line arguments.")]
     public List<string> AdditionalArguments { get; set; } = [];
 
+    public override void WriteToStream(ResourceBinaryWriter writer, Endian endianness)
+    {
+        base.WriteToStream(writer, endianness);
+    }
+    public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness)
+    {
+        base.ParseFromStream(reader, endianness);
+    }
+
     public IReadOnlyList<ShaderStageCompile> GetCompileStages()
     {
         if (Stages != null && Stages.Count > 0)
@@ -83,8 +92,7 @@ public class ShaderBase : Resource
 
     public ShaderBase(string path) : base(path) { }
 
-    public ShaderBase(string path, Endian endianness = Endian.Agnostic)
-        : base(path, endianness) { }
+    public ShaderBase(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 }
 
 public enum ShaderStageType

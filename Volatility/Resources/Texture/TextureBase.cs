@@ -6,7 +6,7 @@
 // systematically throughout the game.
 
 // Learn More:
-// https://burnout.wiki/wiki/Texture
+// https://burnout.wiki/wiki/Texture/Burnout_Paradise
 
 [ResourceDefinition(ResourceType.Texture)]
 public abstract class TextureBase : Resource
@@ -95,8 +95,7 @@ public abstract class TextureBase : Resource
 
     protected TextureBase() : base() => Depth = 1;
 
-    protected TextureBase(string path, Endian endianness = Endian.Agnostic)
-        : base(path, endianness) { }
+    protected TextureBase(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 }
 // BPR formatted but converted for each platform
 public enum DIMENSION : int

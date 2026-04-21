@@ -392,7 +392,7 @@ public class StreamedDeformationSpec : Resource
         CameraTagsInfo = new (reader, arch);
         LightTagsInfo = new(reader, arch);
 
-        reader.BaseStream.Seek(arch == Arch.x64 ? 0x8 : 0x4, SeekOrigin.Current);
+        reader.BaseStream.Seek(ResourceUtilities.GetPointerSize(ResourceArch), SeekOrigin.Current);
 
         HandlingBodyDimensions = reader.ReadVector3();
 
@@ -580,8 +580,7 @@ public class StreamedDeformationSpec : Resource
 
     public StreamedDeformationSpec() : base() { }
 
-    public StreamedDeformationSpec(string path, Endian endianness = Endian.Agnostic)
-        : base(path, endianness) { }
+    public StreamedDeformationSpec(string path, Endian endianness = Endian.Agnostic) : base(path, endianness) { }
 
     // Section writers
 

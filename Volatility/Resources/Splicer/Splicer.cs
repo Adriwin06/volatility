@@ -15,7 +15,6 @@ namespace Volatility.Resources;
 [ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
 public class Splicer : BinaryResource
 {
-    private const int Version = 1;
     private const int HeaderSize = 0xC;
     private const int SpliceHeaderSize = 0x18;
     private const int SampleRefSize = 0x2C;
@@ -31,9 +30,9 @@ public class Splicer : BinaryResource
         base.ParseFromStream(reader, endianness);
 
         int version = reader.ReadInt32();
-        if (version != Version)
+        if (version != 1)
         {
-            throw new InvalidDataException($"Version mismatch! Version should be {Version}.");
+            throw new InvalidDataException("Version mismatch! Version should be 1.");
         }
 
         int sizedata = reader.ReadInt32();
@@ -46,7 +45,7 @@ public class Splicer : BinaryResource
         long spliceHeadersOffset = reader.BaseStream.Position;
         List<SpliceHeader> spliceHeaders = reader.ParseSection(spliceHeadersOffset, numSplices, SpliceHeader.Read);
 
-        Splices = new List<SpliceData>(numSplices);
+        Splices = new(numSplices);
         foreach (SpliceHeader header in spliceHeaders)
         {
             Splices.Add(header.ToSpliceData());
@@ -96,7 +95,7 @@ public class Splicer : BinaryResource
         long sampleRefsOffset = spliceHeadersOffset + sizeOfSplices;
         long sampleTableOffset = DataOffset + HeaderSize + sizedata;
 
-        writer.Write(Version);
+        writer.Write(1); // version
         writer.Write(sizedata);
         writer.Write(Splices.Count);
 

@@ -6,6 +6,11 @@ namespace Volatility.Utilities;
 
 public class ResourceUtilities
 {
+    public static int GetPointerSize(Arch arch)
+    {
+        return arch == Arch.x64 ? sizeof(ulong) : sizeof(uint);
+    }
+
     public static List<T> GetFixedSizeList<T>(List<T> source, int size)
     {
         List<T> output = new(size);

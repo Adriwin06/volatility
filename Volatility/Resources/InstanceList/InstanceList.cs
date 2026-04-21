@@ -33,8 +33,7 @@ public class InstanceList : Resource
     {
         base.WriteToStream(writer, endianness);
 
-        Arch arch = ResourceArch;
-        int instanceBlockSize = GetInstanceBlockSize(arch);
+        int instanceBlockSize = GetInstanceBlockSize(ResourceArch);
         uint entryCount = (uint)Instances.Count;
 
         long currentOffset = HeaderSize;
@@ -48,7 +47,7 @@ public class InstanceList : Resource
         writer.Write(NumInstances);
         writer.Write(1u);
 
-        writer.WriteSection(instanceListOffset, Instances, (w, instance) => WriteInstanceBlock(w, instance, arch));
+        writer.WriteSection(instanceListOffset, Instances, (w, instance) => WriteInstanceBlock(w, instance, ResourceArch));
     }
 
     public override void ParseFromStream(ResourceBinaryReader reader, Endian endianness = Endian.Agnostic)
@@ -91,7 +90,7 @@ public class InstanceList : Resource
         long blockStart = reader.BaseStream.Position;
 
         ResourceImport.ReadExternalImport(blockStart, reader, importBlockOffset, out ResourceImport modelReference);
-        reader.BaseStream.Seek(blockStart + GetImportPlaceholderSize(arch), SeekOrigin.Begin);
+        reader.BaseStream.Seek(blockStart + ResourceUtilities.GetPointerSize(arch), SeekOrigin.Begin);
 
         short backdropZoneId = reader.ReadInt16();
         reader.BaseStream.Seek(0x2, SeekOrigin.Current);
@@ -108,11 +107,6 @@ public class InstanceList : Resource
             Transform = transform,
             TransformMatrix = transformMatrix,
         };
-    }
-
-    private static int GetImportPlaceholderSize(Arch arch)
-    {
-        return arch == Arch.x64 ? sizeof(ulong) : sizeof(uint);
     }
 
     private static void WriteInstanceBlock(ResourceBinaryWriter writer, Instance instance, Arch arch)

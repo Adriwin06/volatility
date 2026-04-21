@@ -13,11 +13,8 @@ namespace Volatility.Resources;
 [ResourceRegistration(RegistrationPlatforms.All, EndianMapped = true)]
 public class Model : Resource
 {
-    private const int HeaderSize = 0x14;
-    private const int RenderableOffsetSize = sizeof(uint);
     private const int StateSize = sizeof(byte);
     private const int LodDistanceSize = sizeof(float);
-    private const int ImportEntrySize = 0x10;
 
     [EditorHidden]
     public uint HeaderMetadata;
@@ -32,16 +29,18 @@ public class Model : Resource
     {
         base.WriteToStream(writer, endianness);
 
+        Arch arch = ResourceArch;
         int modelCount = ModelDatas.Count;
         if (modelCount > byte.MaxValue)
         {
             throw new InvalidDataException("Model resources cannot store more than 255 renderables.");
         }
 
-        long currentOffset = HeaderSize;
+        int renderablePointerSize = ResourceUtilities.GetPointerSize(arch);
+        long currentOffset = GetHeaderSize(arch);
         long renderablesOffset = ResourceUtilities.GetSectionOffset(
             ref currentOffset,
-            modelCount * RenderableOffsetSize,
+            modelCount * renderablePointerSize,
             1);
         long statesOffset = ResourceUtilities.GetSectionOffset(
             ref currentOffset,
@@ -51,16 +50,17 @@ public class Model : Resource
             ref currentOffset,
             modelCount * LodDistanceSize,
             sizeof(uint));
-        writer.Write((uint)renderablesOffset);
-        writer.Write((uint)statesOffset);
-        writer.Write((uint)lodDistancesOffset);
+
+        writer.WritePointer((ulong)renderablesOffset, arch);
+        writer.WritePointer((ulong)statesOffset, arch);
+        writer.WritePointer((ulong)lodDistancesOffset, arch);
         writer.Write(HeaderMetadata);
         writer.Write((byte)modelCount);
         writer.Write(Flags);
         writer.Write((byte)modelCount);
         writer.Write((byte)0x02);
 
-        writer.WriteSection<ModelData>(renderablesOffset, ModelDatas, static (w, _, index) => w.Write((uint)(index * ImportEntrySize)));
+        writer.WriteSection<ModelData>(renderablesOffset, ModelDatas, (w, _, index) => w.WritePointer((ulong)(index * ResourceImport.ImportEntrySize), arch));
         writer.WriteSection(statesOffset, ModelDatas, (w, modelData) => w.Write((byte)modelData.State));
         writer.WriteSection(lodDistancesOffset, ModelDatas, (w, modelData) => w.Write(modelData.LODDistance));
     }
@@ -69,41 +69,49 @@ public class Model : Resource
     {
         base.ParseFromStream(reader, endianness);
 
-        reader.BaseStream.Seek(0x13, SeekOrigin.Begin);
-        if (reader.ReadByte() != 0x2)
-        {
-            throw new InvalidDataException("Version mismatch!");
-        }
+        Arch arch = ResourceArch;
 
-        reader.BaseStream.Seek(0x0, SeekOrigin.Begin);
-
-        uint renderablesPtr = reader.ReadUInt32();
-        uint renderableStatesPtr = reader.ReadUInt32();
-        uint lodDistancesPtr = reader.ReadUInt32();
+        ulong renderablesPtr = reader.ReadPointer(arch);
+        ulong renderableStatesPtr = reader.ReadPointer(arch);
+        ulong lodDistancesPtr = reader.ReadPointer(arch);
 
         HeaderMetadata = reader.ReadUInt32();
 
         byte numRenderables = reader.ReadByte();
+        Flags = reader.ReadByte();
+        byte numStates = reader.ReadByte();
+        byte version = reader.ReadByte();
+
+        if (version != 0x2)
+        {
+            throw new InvalidDataException($"Version mismatch! Version should be 2. (Found version {version})");
+        }
+
         if (numRenderables == 0)
         {
             Console.WriteLine("WARNING: Found no renderables in this model!");
         }
 
-        Flags = reader.ReadByte();
+        if (numStates != numRenderables)
+        {
+            throw new InvalidDataException(
+                $"Unsupported model header: numStates ({numStates}) does not match numRenderables ({numRenderables}).");
+        }
 
+        int renderablePointerSize = ResourceUtilities.GetPointerSize(arch);
         long importsOffset = Math.Max(
-            lodDistancesPtr + (numRenderables * LodDistanceSize),
+            (long)lodDistancesPtr + (numStates * LodDistanceSize),
             Math.Max(
-                renderablesPtr + (numRenderables * RenderableOffsetSize),
-                renderableStatesPtr + (numRenderables * StateSize)));
+                (long)renderablesPtr + (numRenderables * renderablePointerSize),
+                (long)renderableStatesPtr + (numStates * StateSize)));
 
         ModelDatas.Clear();
-        for (int i = 0; i < numRenderables; i++)
+        for (int i = 0; i < numStates; i++)
         {
             ModelDatas.Add(ReadModelData(
                 reader,
+                arch,
                 i,
-                numRenderables,
                 renderablesPtr,
                 renderableStatesPtr,
                 lodDistancesPtr,
@@ -118,25 +126,19 @@ public class Model : Resource
 
     private static ModelData ReadModelData(
         ResourceBinaryReader reader,
+        Arch arch,
         int index,
-        byte numRenderables,
-        uint renderablesPtr,
-        uint renderableStatesPtr,
-        uint lodDistancesPtr,
+        ulong renderablesPtr,
+        ulong renderableStatesPtr,
+        ulong lodDistancesPtr,
         long importsOffset)
     {
         ModelData modelData = new();
+        int renderablePointerSize = ResourceUtilities.GetPointerSize(arch);
 
-        reader.ParseSection(renderablesPtr + (index * RenderableOffsetSize), r => r.ReadUInt32(), out uint importRelativeOffset);
-        reader.ParseSection(renderableStatesPtr + index, r => (State)r.ReadByte(), out modelData.State);
-        reader.ParseSection(lodDistancesPtr + (index * LodDistanceSize), r => r.ReadSingle(), out modelData.LODDistance);
-
-        reader.BaseStream.Seek(
-            importRelativeOffset +
-            renderablesPtr +
-            (numRenderables * (RenderableOffsetSize + StateSize + LodDistanceSize)) +
-            (reader.Endianness == Endian.BE ? 0x4 : 0x0),
-            SeekOrigin.Begin);
+        reader.ParseSection(renderablesPtr + ((ulong)index * (ulong)renderablePointerSize), r => r.ReadPointer(arch), out _);
+        reader.ParseSection(renderableStatesPtr + (ulong)index, r => (State)r.ReadByte(), out modelData.State);
+        reader.ParseSection(lodDistancesPtr + ((ulong)index * LodDistanceSize), r => r.ReadSingle(), out modelData.LODDistance);
 
         ResourceImport.ReadExternalImport(index, reader, importsOffset, out modelData.ResourceReference);
         return modelData;
@@ -144,6 +146,9 @@ public class Model : Resource
 
     public IEnumerable<KeyValuePair<long, ResourceImport>> GetExternalImports()
     {
+        int renderablePointerSize = ResourceUtilities.GetPointerSize(ResourceArch);
+        long renderablesOffset = GetHeaderSize(ResourceArch);
+
         for (int i = 0; i < ModelDatas.Count; i++)
         {
             ResourceImport resourceReference = ModelDatas[i].ResourceReference;
@@ -153,9 +158,14 @@ public class Model : Resource
             }
 
             yield return new KeyValuePair<long, ResourceImport>(
-                HeaderSize + (i * RenderableOffsetSize),
+                renderablesOffset + (i * renderablePointerSize),
                 resourceReference);
         }
+    }
+
+    private static int GetHeaderSize(Arch arch)
+    {
+        return (ResourceUtilities.GetPointerSize(arch) * 3) + sizeof(uint) + 0x4;
     }
 
     public struct ModelData
