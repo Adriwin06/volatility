@@ -74,6 +74,27 @@ public class TextureBPR : TextureBase
     {
         base.ParseFromStream(reader, endianness);
 
+        if (DDSTextureUtilities.TryReadHeader(reader.BaseStream, out DDSHeaderInfo dds))
+        {
+            Width = (ushort)dds.Width;
+            Height = (ushort)dds.Height;
+            Depth = (ushort)dds.Depth;
+            MipmapLevels = (byte)Math.Min(byte.MaxValue, dds.MipmapCount);
+            ArraySize = (ushort)Math.Max(1, dds.ArraySize);
+            Dimension = dds.IsCube ? DIMENSION.DIMENSION_CUBE : dds.IsVolume ? DIMENSION.DIMENSION_3D : DIMENSION.DIMENSION_2D;
+            Format = dds.DxgiFormat != DXGI_FORMAT.DXGI_FORMAT_UNKNOWN
+                ? dds.DxgiFormat
+                : dds.FourCCString switch
+                {
+                    "DXT1" => DXGI_FORMAT.DXGI_FORMAT_BC1_UNORM,
+                    "DXT3" => DXGI_FORMAT.DXGI_FORMAT_BC2_UNORM,
+                    "DXT5" => DXGI_FORMAT.DXGI_FORMAT_BC3_UNORM,
+                    _ when dds.RgbBitCount == 32 && dds.RBitMask == 0x00FF0000u => DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM,
+                    _ => DXGI_FORMAT.DXGI_FORMAT_UNKNOWN,
+                };
+            return;
+        }
+
         SetResourceArch(reader.BaseStream.Length > 0x40 ? Arch.x64 : Arch.x32);
 
         int pointerSize = ResourceUtilities.GetPointerSize(ResourceArch);

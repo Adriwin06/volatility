@@ -163,6 +163,27 @@ public class TextureX360 : TextureBase
     {
         base.ParseFromStream(reader, endianness);
 
+        if (DDSTextureUtilities.TryReadHeader(reader.BaseStream, out DDSHeaderInfo dds))
+        {
+            Width = (ushort)dds.Width;
+            Height = (ushort)dds.Height;
+            Depth = (ushort)dds.Depth;
+            MipmapLevels = (byte)Math.Min(byte.MaxValue, dds.MipmapCount);
+            MostDetailedMip = 0;
+            Dimension = dds.IsCube ? DIMENSION.DIMENSION_CUBE : dds.IsVolume ? DIMENSION.DIMENSION_3D : DIMENSION.DIMENSION_2D;
+            Format.DataFormat = dds.FourCCString switch
+            {
+                "DXT1" => GPUTEXTUREFORMAT.GPUTEXTUREFORMAT_DXT1,
+                "DXT3" => GPUTEXTUREFORMAT.GPUTEXTUREFORMAT_DXT2_3,
+                "DXT5" => GPUTEXTUREFORMAT.GPUTEXTUREFORMAT_DXT4_5,
+                _ when dds.RgbBitCount == 32 => GPUTEXTUREFORMAT.GPUTEXTUREFORMAT_8_8_8_8,
+                _ => Format.DataFormat,
+            };
+            PushInternalDimension();
+            PushInternalFormat();
+            return;
+        }
+
         // X360 stores Texture values in LE
         reader.SetEndianness(Endian.LE);
 

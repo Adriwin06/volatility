@@ -1,6 +1,8 @@
 using System.Reflection;
 
+using Volatility.Operations.Resources;
 using Volatility.Resources;
+using Volatility.Utilities;
 
 using static Volatility.Utilities.TypeUtilities;
 using static Volatility.Utilities.ResourceIDUtilities;
@@ -118,6 +120,8 @@ internal class AutotestCommand : ICommand
         textureHeaderX360.PushAll();
         TestHeaderRW("autotest_header_X360.dat", textureHeaderX360);
 
+        await TestResourceGraphRW();
+
         // File name endian flip test case
         string endianFlipTestName = "12_34_56_78_texture.dat";
         Console.WriteLine($"AUTOTEST - Endian Test: Flipped endian {endianFlipTestName} to {FlipPathResourceIDEndian(endianFlipTestName)}");
@@ -155,11 +159,10 @@ internal class AutotestCommand : ICommand
             if (skipImport)
                 return;
             
-            TextureBase? newHeader = System.ComponentModel.TypeDescriptor.CreateInstance(
-                                provider: null,
-                                objectType: header.GetType(),
-                                argTypes: [typeof(string)],
-                                args: new object[] { fs.Name }) as TextureBase;
+            TextureBase? newHeader = Activator.CreateInstance(
+                header.GetType(),
+                fs.Name,
+                Endian.Agnostic) as TextureBase;
 
             try
             {
@@ -232,6 +235,325 @@ internal class AutotestCommand : ICommand
 
         Console.WriteLine(">> Finished Comparing properties and fields of " + type.Name + $" - {mismatches} mismatches");
         Console.ResetColor();
+    }
+
+    private static async Task TestResourceGraphRW()
+    {
+        string tempDir = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            "volatility_autotest_resource_graph_" + Guid.NewGuid().ToString("N"));
+
+        Directory.CreateDirectory(tempDir);
+        Console.WriteLine($"AUTOTEST - Resource graph smoke tests writing to {tempDir}");
+
+        try
+        {
+            foreach (Platform platform in new[] { Platform.BPR, Platform.X360 })
+            {
+                await TestResourceGraphRW(tempDir, platform);
+            }
+        }
+        finally
+        {
+            string fullTempDir = System.IO.Path.GetFullPath(tempDir);
+            string fullTempRoot = System.IO.Path.GetFullPath(System.IO.Path.GetTempPath());
+            if (fullTempDir.StartsWith(fullTempRoot, StringComparison.OrdinalIgnoreCase)
+                && Directory.Exists(fullTempDir))
+            {
+                Directory.Delete(fullTempDir, recursive: true);
+            }
+        }
+    }
+
+    private static async Task TestResourceGraphRW(string tempDir, Platform platform)
+    {
+        ResourceImport modelRef = ExternalImport($"autotest_{platform}_model");
+        ResourceImport secondaryModelRef = ExternalImport($"autotest_{platform}_secondary_model");
+        ResourceImport graphicsSpecRef = ExternalImport($"autotest_{platform}_graphics_spec");
+        ResourceImport wheelSpecRef = ExternalImport($"autotest_{platform}_wheel_graphics_spec");
+
+        GraphicsStub graphicsStub = new()
+        {
+            AssetName = $"autotest_{platform}_graphics_stub",
+            ResourceID = ResourceID.HashFromString($"autotest_{platform}_graphics_stub"),
+            VehicleGraphicsIndex = 1,
+            WheelGraphicsIndex = 0,
+            Unknown0 = 7,
+            Unknown1 = 9,
+            GraphicsSpecReference = graphicsSpecRef,
+            WheelGraphicsSpecReference = wheelSpecRef,
+        };
+        GraphicsStub importedStub = await RoundTripResource(tempDir, "graphics_stub", platform, graphicsStub);
+        AssertEqual("GraphicsStub.VehicleGraphicsIndex", graphicsStub.VehicleGraphicsIndex, importedStub.VehicleGraphicsIndex);
+        AssertImport("GraphicsStub.GraphicsSpecReference", graphicsSpecRef, importedStub.GraphicsSpecReference);
+        AssertImport("GraphicsStub.WheelGraphicsSpecReference", wheelSpecRef, importedStub.WheelGraphicsSpecReference);
+
+        WheelGraphicsSpec wheelSpec = new()
+        {
+            AssetName = $"autotest_{platform}_wheel_spec",
+            ResourceID = ResourceID.HashFromString($"autotest_{platform}_wheel_spec"),
+            Version = 1,
+            WheelModelIndex = 0,
+            CaliperModelIndex = 1,
+            Unknown0 = 3,
+            WheelModelReference = modelRef,
+            CaliperModelReference = secondaryModelRef,
+        };
+        WheelGraphicsSpec importedWheelSpec = await RoundTripResource(tempDir, "wheel_graphics_spec", platform, wheelSpec);
+        AssertEqual("WheelGraphicsSpec.CaliperModelIndex", wheelSpec.CaliperModelIndex, importedWheelSpec.CaliperModelIndex);
+        AssertImport("WheelGraphicsSpec.WheelModelReference", modelRef, importedWheelSpec.WheelModelReference);
+        AssertImport("WheelGraphicsSpec.CaliperModelReference", secondaryModelRef, importedWheelSpec.CaliperModelReference);
+
+        GraphicsSpec graphicsSpec = new()
+        {
+            AssetName = $"autotest_{platform}_graphics_spec",
+            ResourceID = ResourceID.HashFromString($"autotest_{platform}_graphics_spec"),
+            Version = 3,
+            Parts =
+            [
+                new GraphicsPart
+                {
+                    ModelReference = modelRef,
+                    PartLocator = Matrix44.Identity,
+                    PartVolumeId = 4,
+                    NumRigidBodiesForPart = 1,
+                    RigidBodyToSkinMatrixTransforms = [Matrix44.Identity],
+                },
+            ],
+            ShatteredGlassParts =
+            [
+                new ShatteredGlassPart
+                {
+                    ModelReference = secondaryModelRef,
+                    ModelIndex = 1,
+                    BodyPartIndex = 2,
+                    BodyPartType = 3,
+                },
+            ],
+        };
+        GraphicsSpec importedGraphicsSpec = await RoundTripResource(tempDir, "graphics_spec", platform, graphicsSpec);
+        AssertEqual("GraphicsSpec.Parts.Count", 1, importedGraphicsSpec.Parts.Count);
+        AssertEqual("GraphicsSpec.ShatteredGlassParts.Count", 1, importedGraphicsSpec.ShatteredGlassParts.Count);
+        AssertEqual("GraphicsSpec.PartVolumeId", graphicsSpec.Parts[0].PartVolumeId, importedGraphicsSpec.Parts[0].PartVolumeId);
+        AssertImport("GraphicsSpec.Part.ModelReference", modelRef, importedGraphicsSpec.Parts[0].ModelReference);
+        AssertImport("GraphicsSpec.ShatteredGlass.ModelReference", secondaryModelRef, importedGraphicsSpec.ShatteredGlassParts[0].ModelReference);
+
+        PropGraphicsList propGraphicsList = new()
+        {
+            AssetName = $"autotest_{platform}_prop_graphics_list",
+            ResourceID = ResourceID.HashFromString($"autotest_{platform}_prop_graphics_list"),
+            ZoneNumber = 12,
+            PropModels =
+            [
+                new PropGraphics
+                {
+                    TypeId = 0x101,
+                    PropModelPointer = 0,
+                    PartsPointer = 0,
+                    ModelReference = modelRef,
+                },
+            ],
+            PropPartModels =
+            [
+                new PropPartGraphics
+                {
+                    TypeId = 0x101,
+                    PartId = 0x202,
+                    PropModelPointer = 0,
+                    ModelReference = secondaryModelRef,
+                },
+            ],
+        };
+        PropGraphicsList importedPropGraphicsList = await RoundTripResource(tempDir, "prop_graphics_list", platform, propGraphicsList);
+        AssertEqual("PropGraphicsList.ZoneNumber", propGraphicsList.ZoneNumber, importedPropGraphicsList.ZoneNumber);
+        AssertEqual("PropGraphicsList.PropModels.Count", 1, importedPropGraphicsList.PropModels.Count);
+        AssertEqual("PropGraphicsList.PropPartModels.Count", 1, importedPropGraphicsList.PropPartModels.Count);
+        AssertImport("PropGraphicsList.PropModel.Reference", modelRef, importedPropGraphicsList.PropModels[0].ModelReference);
+        AssertImport("PropGraphicsList.PropPart.Reference", secondaryModelRef, importedPropGraphicsList.PropPartModels[0].ModelReference);
+
+        PropInstanceData propInstanceData = new()
+        {
+            AssetName = $"autotest_{platform}_prop_instance_data",
+            ResourceID = ResourceID.HashFromString($"autotest_{platform}_prop_instance_data"),
+            ZoneNumber = 12,
+            NumberOfPropInstanceDataPlusPropParts = 1,
+            Instances =
+            [
+                new PropInstance
+                {
+                    WorldTransform = Matrix44.Identity,
+                    TypeId = 0x101,
+                    Unknown0 = 1,
+                    Flags = 2,
+                    InstanceId = 0x303,
+                    AlternativeType = 0x404,
+                    RotSpeed = 5,
+                    MaxAngle = 6,
+                    MinAngle = 7,
+                    Padding = [0, 0, 0],
+                },
+            ],
+            Cells =
+            [
+                new PropCellData
+                {
+                    First = 0,
+                    Count = 1,
+                    RunningValue = 1,
+                },
+            ],
+        };
+        PropInstanceData importedPropInstanceData = await RoundTripResource(tempDir, "prop_instance_data", platform, propInstanceData);
+        AssertEqual("PropInstanceData.ZoneNumber", propInstanceData.ZoneNumber, importedPropInstanceData.ZoneNumber);
+        AssertEqual("PropInstanceData.Instances.Count", 1, importedPropInstanceData.Instances.Count);
+        AssertEqual("PropInstanceData.Cells.Count", 1, importedPropInstanceData.Cells.Count);
+        AssertEqual("PropInstanceData.InstanceId", propInstanceData.Instances[0].InstanceId, importedPropInstanceData.Instances[0].InstanceId);
+
+        StaticSoundMap staticSoundMap = new()
+        {
+            AssetName = $"autotest_{platform}_static_sound_map",
+            ResourceID = ResourceID.HashFromString($"autotest_{platform}_static_sound_map"),
+            Min = new Vector2(-1, -2),
+            Max = new Vector2(3, 4),
+            SubRegionWorldSize = 64,
+            NumSubRegionsX = 1,
+            NumSubRegionsZ = 1,
+            RootType = 8,
+            Entities =
+            [
+                new StaticSoundEntity
+                {
+                    Position = new Vector3(1, 2, 3),
+                    Unknown0 = 4,
+                    Unknown1 = 5,
+                },
+            ],
+            SubRegions =
+            [
+                new StaticSoundSubRegion
+                {
+                    First = 0,
+                    Count = 1,
+                },
+            ],
+        };
+        StaticSoundMap importedStaticSoundMap = await RoundTripResource(tempDir, "static_sound_map", platform, staticSoundMap);
+        AssertEqual("StaticSoundMap.Entities.Count", 1, importedStaticSoundMap.Entities.Count);
+        AssertEqual("StaticSoundMap.SubRegions.Count", 1, importedStaticSoundMap.SubRegions.Count);
+        AssertEqual("StaticSoundMap.RootType", staticSoundMap.RootType, importedStaticSoundMap.RootType);
+
+        IdList idList = new()
+        {
+            AssetName = $"autotest_{platform}_id_list",
+            ResourceID = ResourceID.HashFromString($"autotest_{platform}_id_list"),
+            Ids =
+            [
+                new ResourceImport(ResourceID.HashFromString($"autotest_{platform}_id_0")),
+                new ResourceImport(ResourceID.HashFromString($"autotest_{platform}_id_1")),
+            ],
+        };
+        IdList importedIdList = await RoundTripResource(tempDir, "id_list", platform, idList);
+        AssertEqual("IdList.Ids.Count", 2, importedIdList.Ids.Count);
+        AssertImportID("IdList.Ids[0]", idList.Ids[0], importedIdList.Ids[0]);
+        AssertImportID("IdList.Ids[1]", idList.Ids[1], importedIdList.Ids[1]);
+
+        PolygonSoupList polygonSoupList = new()
+        {
+            AssetName = $"autotest_{platform}_polygon_soup_list",
+            ResourceID = ResourceID.HashFromString($"autotest_{platform}_polygon_soup_list"),
+            Min = new Vector4(-1, -1, -1, 1),
+            Max = new Vector4(1, 1, 1, 1),
+            PolygonSoups =
+            [
+                new PolygonSoup
+                {
+                    Box = new PolygonSoupBox
+                    {
+                        Min = new Vector3(-1, -1, -1),
+                        Max = new Vector3(1, 1, 1),
+                        ValidMasks = -1,
+                    },
+                    VertexOffsets = [0, 0, 0],
+                    CompressionGranularity = 0.25f,
+                    Vertices =
+                    [
+                        new PolygonSoupVertex { X = 0, Y = 0, Z = 0 },
+                        new PolygonSoupVertex { X = 100, Y = 0, Z = 0 },
+                        new PolygonSoupVertex { X = 0, Y = 100, Z = 0 },
+                    ],
+                    Polygons =
+                    [
+                        new PolygonSoupPolygon
+                        {
+                            CollisionTag0 = 1,
+                            CollisionTag1 = 2,
+                            VertexIndices = [0, 1, 2],
+                            EdgeCosines = [0, 0, 0, 0],
+                        },
+                    ],
+                },
+            ],
+        };
+        PolygonSoupList importedPolygonSoupList = await RoundTripResource(tempDir, "polygon_soup_list", platform, polygonSoupList);
+        AssertEqual("PolygonSoupList.PolygonSoups.Count", 1, importedPolygonSoupList.PolygonSoups.Count);
+        AssertEqual("PolygonSoupList.Vertices.Count", 3, importedPolygonSoupList.PolygonSoups[0].Vertices.Count);
+        AssertEqual("PolygonSoupList.Polygons.Count", 1, importedPolygonSoupList.PolygonSoups[0].Polygons.Count);
+
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"AUTOTEST - Resource graph smoke tests passed for {platform}");
+        Console.ResetColor();
+    }
+
+    private static async Task<TResource> RoundTripResource<TResource>(
+        string tempDir,
+        string name,
+        Platform platform,
+        TResource resource)
+        where TResource : Resource
+    {
+        string outputPath = System.IO.Path.Combine(tempDir, $"{platform}_{name}.bin");
+        Console.WriteLine($"AUTOTEST - Writing {platform} {resource.ResourceType} resource graph test...");
+
+        ExportResourceOperation exportOperation = new();
+        await exportOperation.ExecuteAsync(resource, outputPath, platform);
+
+        Resource imported = ResourceFactory.CreateResource(resource.ResourceType, platform, outputPath);
+        if (imported is not TResource typed)
+        {
+            throw new InvalidDataException(
+                $"Expected {typeof(TResource).Name} after round-trip, got {imported.GetType().Name}.");
+        }
+
+        return typed;
+    }
+
+    private static ResourceImport ExternalImport(string name)
+    {
+        return new ResourceImport(ResourceID.HashFromString(name), externalImport: true);
+    }
+
+    private static void AssertImport(string name, ResourceImport expected, ResourceImport actual)
+    {
+        AssertEqual($"{name}.ExternalImport", true, actual.ExternalImport);
+        AssertImportID(name, expected, actual);
+    }
+
+    private static void AssertImportID(string name, ResourceImport expected, ResourceImport actual)
+    {
+        AssertEqual(
+            $"{name}.ReferenceID",
+            ResourceUtilities.ResolveResourceID(expected),
+            ResourceUtilities.ResolveResourceID(actual));
+    }
+
+    private static void AssertEqual<T>(string name, T expected, T actual)
+    {
+        if (EqualityComparer<T>.Default.Equals(expected, actual))
+        {
+            return;
+        }
+
+        throw new InvalidDataException($"{name} mismatch. Expected {expected}, got {actual}.");
     }
 
     public AutotestCommand() { }

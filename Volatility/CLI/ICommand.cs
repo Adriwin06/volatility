@@ -41,7 +41,11 @@ internal interface ICommand
             switch (filter)
             {
                 case TargetFileType.Header:
-                    if (!name.Contains(".dat") && !name.Contains("_1.bin")
+                    bool isSupportedHeader = name.Contains(".dat")
+                        || name.Contains("_1.bin")
+                        || name.EndsWith(".dds", StringComparison.OrdinalIgnoreCase);
+
+                    if (!isSupportedHeader
                         || name.Contains("_secondary")
                         || name.Contains("_texture")
                         || name.Contains("_imports")

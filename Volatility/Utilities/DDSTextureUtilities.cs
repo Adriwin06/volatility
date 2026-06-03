@@ -4,6 +4,97 @@ namespace Volatility.Utilities;
 
 public static class DDSTextureUtilities
 {
+    private const uint DDSMagic = 0x20534444;
+
+    public static bool TryReadHeader(string path, out DDSHeaderInfo info)
+    {
+        using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        return TryReadHeader(stream, out info);
+    }
+
+    public static bool TryReadHeader(Stream stream, out DDSHeaderInfo info)
+    {
+        info = default;
+        if (!stream.CanSeek || stream.Length < 0x80)
+        {
+            return false;
+        }
+
+        long originalPosition = stream.Position;
+        try
+        {
+            stream.Seek(0, SeekOrigin.Begin);
+            using BinaryReader reader = new(stream, System.Text.Encoding.ASCII, leaveOpen: true);
+            if (reader.ReadUInt32() != DDSMagic)
+            {
+                return false;
+            }
+
+            uint headerSize = reader.ReadUInt32();
+            if (headerSize != 124)
+            {
+                return false;
+            }
+
+            info.Flags = reader.ReadUInt32();
+            info.Height = reader.ReadUInt32();
+            info.Width = reader.ReadUInt32();
+            info.PitchOrLinearSize = reader.ReadUInt32();
+            info.Depth = Math.Max(1, reader.ReadUInt32());
+            info.MipmapCount = Math.Max(1, reader.ReadUInt32());
+
+            stream.Seek(11 * sizeof(uint), SeekOrigin.Current);
+
+            uint pixelFormatSize = reader.ReadUInt32();
+            if (pixelFormatSize != 32)
+            {
+                return false;
+            }
+
+            info.PixelFormatFlags = reader.ReadUInt32();
+            info.FourCC = reader.ReadUInt32();
+            info.RgbBitCount = reader.ReadUInt32();
+            info.RBitMask = reader.ReadUInt32();
+            info.GBitMask = reader.ReadUInt32();
+            info.BBitMask = reader.ReadUInt32();
+            info.ABitMask = reader.ReadUInt32();
+            info.Caps = reader.ReadUInt32();
+            info.Caps2 = reader.ReadUInt32();
+            stream.Seek(3 * sizeof(uint), SeekOrigin.Current);
+            info.DataOffset = 0x80;
+
+            if (info.FourCC == FourCC("DX10") && stream.Length >= 0x94)
+            {
+                info.DxgiFormat = (DXGI_FORMAT)reader.ReadUInt32();
+                info.ResourceDimension = reader.ReadUInt32();
+                info.MiscFlag = reader.ReadUInt32();
+                info.ArraySize = reader.ReadUInt32();
+                reader.ReadUInt32();
+                info.DataOffset = 0x94;
+            }
+
+            return true;
+        }
+        finally
+        {
+            stream.Seek(originalPosition, SeekOrigin.Begin);
+        }
+    }
+
+    public static byte[] ReadBitmapDataFromDDS(string path)
+    {
+        using FileStream stream = new(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        if (!TryReadHeader(stream, out DDSHeaderInfo info))
+        {
+            return File.ReadAllBytes(path);
+        }
+
+        stream.Seek(info.DataOffset, SeekOrigin.Begin);
+        byte[] data = new byte[stream.Length - info.DataOffset];
+        _ = stream.Read(data, 0, data.Length);
+        return data;
+    }
+
     public static byte[] CreateDDSFile(TextureBase texture, byte[] bitmapData)
     {
         byte[] outputData = (byte[])bitmapData.Clone();
@@ -420,6 +511,19 @@ public static class DDSTextureUtilities
              | ((uint)value[3] << 24);
     }
 
+    public static string FourCCToString(uint fourCC)
+    {
+        Span<byte> bytes =
+        [
+            (byte)(fourCC & 0xFF),
+            (byte)((fourCC >> 8) & 0xFF),
+            (byte)((fourCC >> 16) & 0xFF),
+            (byte)((fourCC >> 24) & 0xFF),
+        ];
+
+        return System.Text.Encoding.ASCII.GetString(bytes);
+    }
+
     private sealed class DDSWriteConfiguration
     {
         public required uint PixelFormatFlags { get; init; }
@@ -545,4 +649,32 @@ public static class DDSTextureUtilities
         Texture2D = 3,
         Texture3D = 4,
     }
+}
+
+public struct DDSHeaderInfo
+{
+    public uint Flags;
+    public uint Width;
+    public uint Height;
+    public uint PitchOrLinearSize;
+    public uint Depth;
+    public uint MipmapCount;
+    public uint PixelFormatFlags;
+    public uint FourCC;
+    public uint RgbBitCount;
+    public uint RBitMask;
+    public uint GBitMask;
+    public uint BBitMask;
+    public uint ABitMask;
+    public uint Caps;
+    public uint Caps2;
+    public DXGI_FORMAT DxgiFormat;
+    public uint ResourceDimension;
+    public uint MiscFlag;
+    public uint ArraySize;
+    public int DataOffset;
+
+    public string FourCCString => DDSTextureUtilities.FourCCToString(FourCC);
+    public bool IsCube => (Caps2 & 0x200) != 0;
+    public bool IsVolume => (Caps2 & 0x200000) != 0;
 }

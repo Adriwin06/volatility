@@ -111,6 +111,7 @@ public struct ResourceImport
         {
             ulong resourceValue = reader.ReadUInt64();
             long entryKey = reader.ReadUInt32();
+            reader.BaseStream.Seek(sizeof(uint), SeekOrigin.Current);
 
             if (entryKey != fileOffset) continue;
             

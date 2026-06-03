@@ -104,6 +104,25 @@ public class TexturePS3 : TextureBase
     {
         base.ParseFromStream(reader, endianness);
 
+        if (Volatility.Utilities.DDSTextureUtilities.TryReadHeader(reader.BaseStream, out Volatility.Utilities.DDSHeaderInfo dds))
+        {
+            Width = (ushort)dds.Width;
+            Height = (ushort)dds.Height;
+            Depth = (ushort)dds.Depth;
+            MipmapLevels = (byte)Math.Min(byte.MaxValue, dds.MipmapCount);
+            Dimension = dds.IsCube ? DIMENSION.DIMENSION_CUBE : dds.IsVolume ? DIMENSION.DIMENSION_3D : DIMENSION.DIMENSION_2D;
+            Format = dds.FourCCString switch
+            {
+                "DXT1" => CELL_GCM_COLOR_FORMAT.CELL_GCM_TEXTURE_COMPRESSED_DXT1,
+                "DXT3" => CELL_GCM_COLOR_FORMAT.CELL_GCM_TEXTURE_COMPRESSED_DXT23,
+                "DXT5" => CELL_GCM_COLOR_FORMAT.CELL_GCM_TEXTURE_COMPRESSED_DXT45,
+                _ when dds.RgbBitCount == 32 => CELL_GCM_COLOR_FORMAT.CELL_GCM_TEXTURE_A8R8G8B8,
+                _ => CELL_GCM_COLOR_FORMAT.CELL_GCM_TEXTURE_INVALID,
+            };
+            PushAll();
+            return;
+        }
+
         Format = (CELL_GCM_COLOR_FORMAT)reader.ReadByte();
         MipmapLevels = reader.ReadByte();
         CellDimension = (CELL_GCM_TEXTURE_DIMENSION)reader.ReadByte();

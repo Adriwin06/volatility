@@ -87,10 +87,11 @@ public abstract class Resource
             {
                 // We store ResourceIDs how BE platforms do to be consistent with the original console releases.
                 // This makes it easy to cross reference assets between all platforms.
+                string normalizedResourceID = name.Replace("_", string.Empty);
                 ResourceID = Convert.ToUInt64((importEndianness == Endian.LE && Unpacker != Unpacker.YAP)
-                    ? FlipResourceIDEndian(name)
-                    : name
-                    , 16);
+                    ? FlipResourceIDEndian(normalizedResourceID)
+                    : normalizedResourceID,
+                    16);
 
                 string newName = GetNameByResourceID(ResourceID);
                 AssetName = !string.IsNullOrEmpty(newName)
@@ -100,7 +101,7 @@ public abstract class Resource
             else
             {
                 // TODO: Add new entry to ResourceDB
-                ResourceID = Convert.ToUInt64(ResourceID.FromIDString(name));
+                ResourceID = ResourceID.HashFromString(name);
                 AssetName = name;
             }
 
@@ -134,6 +135,7 @@ public abstract class Resource
 public enum ResourceType
 {
     Texture = 0x0,
+    Raster = Texture,
     Material = 0x1,
     RenderableMesh = 0x2,
     TextFile = 0x3,
@@ -144,6 +146,7 @@ public enum ResourceType
     VERTEXBUFFERITEM = 0x8,
     VertexBuffer = 0x9,
     VertexDescriptor = 0xA,
+    VertexDesc = VertexDescriptor,
     RwMaterialCRC32 = 0xB,
     Renderable = 0xC,
     MaterialTechnique = 0xD,
@@ -152,6 +155,7 @@ public enum ResourceType
     DepthStencilState = 0x10,
     RasterizerState = 0x11,
     RwShaderProgramBuffer = 0x12,
+    ShaderProgramBuffer = RwShaderProgramBuffer,
     RenderTargetState = 0x13,
     RwShaderParameter = 0x14,
     RenderableAssembly = 0x15,
@@ -169,6 +173,7 @@ public enum ResourceType
     LuaCode = 0x22,
     InstanceList = 0x23,
     ClusteredMesh = 0x24,
+    CollisionMeshData = ClusteredMesh,
     IdList = 0x25,
     InstanceCollisionList = 0x26,
     Language = 0x27,

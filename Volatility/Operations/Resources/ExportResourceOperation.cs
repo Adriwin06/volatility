@@ -44,7 +44,13 @@ internal class ExportResourceOperation
             ResolveExternalImportsUnpackerFormat(resource, importUnpackerOverride),
             writeImportsToSeparateFile);
 
-        if (resource is ShaderBase shader)
+        if (resource is RenderableBase renderable)
+        {
+            renderable.WriteModelBodySidecar(outputPath);
+        }
+
+        if (resource is ShaderBase shader
+            && resource is not IRawShaderPayload { HasRawShaderPayload: true })
         {
             var stages = shader.GetCompileStages();
             bool useStageSuffix = stages.Count > 1;

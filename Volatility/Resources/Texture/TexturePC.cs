@@ -63,6 +63,25 @@ public class TexturePC : TextureBase
     {
         base.ParseFromStream(reader, endianness);
 
+        if (Volatility.Utilities.DDSTextureUtilities.TryReadHeader(reader.BaseStream, out Volatility.Utilities.DDSHeaderInfo dds))
+        {
+            Width = (ushort)dds.Width;
+            Height = (ushort)dds.Height;
+            Depth = (ushort)dds.Depth;
+            MipmapLevels = (byte)Math.Min(byte.MaxValue, dds.MipmapCount);
+            Dimension = dds.IsCube ? DIMENSION.DIMENSION_CUBE : dds.IsVolume ? DIMENSION.DIMENSION_3D : DIMENSION.DIMENSION_2D;
+            Format = dds.FourCCString switch
+            {
+                "DXT1" => D3DFORMAT.D3DFMT_DXT1,
+                "DXT3" => D3DFORMAT.D3DFMT_DXT3,
+                "DXT5" => D3DFORMAT.D3DFMT_DXT5,
+                _ when dds.RgbBitCount == 32 => D3DFORMAT.D3DFMT_A8R8G8B8,
+                _ => D3DFORMAT.D3DFMT_UNKNOWN,
+            };
+            PushAll();
+            return;
+        }
+
         reader.BaseStream.Seek(8, SeekOrigin.Begin);    // Skip over Data & Interface pointers
         Unknown0 = reader.ReadUInt32();
         reader.BaseStream.Seek(2, SeekOrigin.Current);  // Skip over MemoryClass

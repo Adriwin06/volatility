@@ -40,9 +40,7 @@ internal partial class ImportResourceOperation
 
         if (resourceType == ResourceType.Texture)
         {
-            string texturePath = TextureBitmapUtilities.GetSecondaryBitmapPath(sourceFile, resource.Unpacker);
-
-            if (resource is TextureBase texture && File.Exists(texturePath))
+            if (resource is TextureBase texture)
             {
                 string outPath = Path.Combine
                 (
@@ -50,8 +48,31 @@ internal partial class ImportResourceOperation
                     Path.GetFileNameWithoutExtension(Path.GetFileNameWithoutExtension(Path.GetFullPath(filePath)))
                 );
 
-                TextureBitmapUtilities.WriteNormalizedBitmapFile(texture, texturePath, $"{outPath}.{resourceType}Bitmap", overwrite);
+                if (Path.GetExtension(sourceFile).Equals(".dds", StringComparison.OrdinalIgnoreCase))
+                {
+                    ResourceSidecarUtilities.WriteSidecarBytes(
+                        $"{outPath}.{resourceType}",
+                        $".{resourceType}Bitmap",
+                        DDSTextureUtilities.ReadBitmapDataFromDDS(sourceFile),
+                        overwrite);
+                }
+                else
+                {
+                    string texturePath = TextureBitmapUtilities.GetSecondaryBitmapPath(sourceFile, resource.Unpacker);
+
+                    if (File.Exists(texturePath))
+                    {
+                        TextureBitmapUtilities.WriteNormalizedBitmapFile(texture, texturePath, $"{outPath}.{resourceType}Bitmap", overwrite);
+                    }
+                }
             }
+        }
+
+        if (resource is ISidecarPayloadResource sidecarPayloadResource)
+        {
+            string payloadSuffix = sidecarPayloadResource.PayloadSuffix;
+            ResourceSidecarUtilities.WriteSidecarBytes(filePath, payloadSuffix, sidecarPayloadResource.GetPayloadBytes(), overwrite);
+            sidecarPayloadResource.SetPayloadPath(ResourceSidecarUtilities.GetRelativeSidecarName(filePath, payloadSuffix));
         }
 
         if (resourceType == ResourceType.Splicer)

@@ -62,7 +62,7 @@ internal static class TextureBitmapUtilities
             Unpacker.DGI => ".dat",
             Unpacker.YAP => "_primary.dat",
             Unpacker.Raw => ".dat",
-            Unpacker.Volatility => throw new NotImplementedException(),
+            Unpacker.Volatility => ".dat",
             _ => throw new NotImplementedException(),
         };
     }
@@ -75,7 +75,7 @@ internal static class TextureBitmapUtilities
             Unpacker.DGI => "_texture.dat",
             Unpacker.YAP => "_secondary.dat",
             Unpacker.Raw => "_texture.dat",
-            Unpacker.Volatility => throw new NotImplementedException(),
+            Unpacker.Volatility => "_texture.dat",
             _ => throw new NotImplementedException(),
         };
     }

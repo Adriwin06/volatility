@@ -32,7 +32,25 @@ public static class ResourceFactory
         AddRegisteredResource<GuiPopup>(registry);
         AddRegisteredResource<ShaderBase>(registry);
         AddRegisteredResource<ShaderPC>(registry);
+        AddRegisteredResource<ShaderBPR>(registry);
+        AddRegisteredResource<ShaderX360>(registry);
+        AddRegisteredResource<ShaderPS3>(registry);
         AddRegisteredResource<ShaderProgramBufferBPR>(registry);
+        AddRegisteredResource<ShaderProgramBufferRaw>(registry);
+        AddRegisteredResource<GraphicsStub>(registry);
+        AddRegisteredResource<GraphicsSpec>(registry);
+        AddRegisteredResource<WheelGraphicsSpec>(registry);
+        AddRegisteredResource<PropGraphicsList>(registry);
+        AddRegisteredResource<PropInstanceData>(registry);
+        AddRegisteredResource<StaticSoundMap>(registry);
+        AddRegisteredResource<IdList>(registry);
+        AddRegisteredResource<PolygonSoupList>(registry);
+        AddRegisteredResource<Material>(registry);
+        AddRegisteredResource<MaterialTechnique>(registry);
+        AddRegisteredResource<MaterialState>(registry);
+        AddRegisteredResource<TextureState>(registry);
+        AddRegisteredResource<VertexDescriptor>(registry);
+        AddRegisteredResource<ClusteredMesh>(registry);
 
         return registry.Build();
     }
